@@ -102,6 +102,7 @@ children = {}
 setmetatable(children, {__mode="k"})
 
 function node_done_or(handle)
+    --pause()
     local c = children[handle]
     if c then
         for i,j in pairs(c) do
@@ -139,10 +140,16 @@ function par_or(fa, fb, name)
         handle.node_done = node_done_or
         handle.name = name -- debug
         for i,j in ipairs(sub) do
+            -- TODO figure out how to detect if a child is dead by now
             co.resume(j)
         end
 
-        -- TODO only yield if coa and cob are still alive
+        -- Only yield if coa and cob are still alive
+        for i,j in ipairs(sub) do
+            if j.state == "dead" then
+                return
+            end
+        end
         co.yield()
     end
 end
@@ -193,8 +200,13 @@ function par_and(fa, fb, name)
             co.resume(j)
         end
 
-        -- TODO only yield if a child is still alive
-        co.yield()
+        -- Only yield if a child is still alive
+        for i,j in ipairs(sub) do
+            if j.state == "suspended" then
+                co.yield()
+                break
+            end
+        end
     end
 end
 
@@ -240,7 +252,10 @@ function start(f)
         handle.sub.parent = nil
         handle.sub.node_done(handle.sub)
         co.kill(handle.sub)
-        co.resume(current)
+        if current then
+            -- If the program ended, there will be no 'current' to resume
+            co.resume(current)
+        end
     end
     co.resume(sub)
 end
@@ -284,6 +299,17 @@ function pg()
     print("fim g")
 end
 
+function ph()
+    hh = co.running()
+    print("ini h")
+    print("fim h")
+end
+
+function pi()
+    hi = co.running()
+    print("ini i")
+    print("fim i")
+end
 
 function main()
 --    par_or(pa, pb)()
@@ -299,5 +325,10 @@ function main()
 --    par_or(par_and(pa, pb), pc)()
 end
 
-co.wrap(main)()
+--co.wrap(main)()
 --co.resume(ha)
+
+--start(par_or(par_or(pa, pb), pe))
+--start(par_and(pa, par_or(par_or(pb, pc), ph)))
+--start(par_or(par_and(pa, pb), ph))
+start(par_or(par_or(pb, pi), pa))

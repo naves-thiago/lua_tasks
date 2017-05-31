@@ -45,6 +45,7 @@ function co.resume(handle, ...)
     if current then
         current.state = "suspended"
 
+--[[
         if children[current] == nil then
             children[current] = {}
         end
@@ -55,6 +56,7 @@ function co.resume(handle, ...)
             -- TODO change this to children[current] = true
             table.insert(children[current], handle)
         end
+--]]
     end
 
     return coroutine.resume(handle.handle, ...)
@@ -139,17 +141,30 @@ function par_or(fa, fb, name)
         local handle = co.running()
         handle.node_done = node_done_or
         handle.name = name -- debug
+
+        children[handle] = {}
+        for i,j in ipairs(sub) do
+            j.parent = handle
+            table.insert(children[handle], j)
+        end
+
         for i,j in ipairs(sub) do
             -- TODO figure out how to detect if a child is dead by now
             co.resume(j)
-        end
-
-        -- Only yield if coa and cob are still alive
-        for i,j in ipairs(sub) do
             if j.state == "dead" then
+                -- j finished without yielding.
+                -- stop starting tasks
+                --pause()
                 return
             end
         end
+
+        -- Only yield if coa and cob are still alive
+--        for i,j in ipairs(sub) do
+--            if j.state == "dead" then
+--                return
+--            end
+--        end
         co.yield()
     end
 end
@@ -157,18 +172,20 @@ end
 function node_done_and(handle)
     local c = children[handle]
 
-    for i,j in pairs(c) do
-        if j.state ~= "dead" then
-            return -- There is at least one child alive. Do nothing
+    if c then
+        for i,j in pairs(c) do
+            if j.state ~= "dead" then
+                return -- There is at least one child alive. Do nothing
+            end
         end
-    end
 
-    for i,j in pairs(c) do
-        j.parent = nil
-        if j.node_done then
-            j.node_done(j)
+        for i,j in pairs(c) do
+            j.parent = nil
+            if j.node_done then
+                j.node_done(j)
+            end
+            co.kill(j)
         end
-        co.kill(j)
     end
 
     if handle.parent and handle.parent.node_done then
@@ -185,10 +202,10 @@ function par_and(fa, fb, name)
 
     local coa, cob
     coa = co.create(fa)
-    coa.destructor = node_done_or -- these have only 1 child (or none). simply kill (same as the OR)
+    coa.destructor = node_done_and -- these have only 1 child (or none). simply kill (same as the OR)
 
     cob = co.create(fb)
-    cob.destructor = node_done_or -- these have only 1 child (or none). simply kill (same as the OR)
+    cob.destructor = node_done_and -- these have only 1 child (or none). simply kill (same as the OR)
 
     sub = {coa, cob}
 
@@ -196,6 +213,13 @@ function par_and(fa, fb, name)
         local handle = co.running()
         handle.node_done = node_done_and
         handle.name = name -- debug
+
+        children[handle] = {}
+        for i,j in ipairs(sub) do
+            j.parent = handle
+            table.insert(children[handle], j)
+        end
+
         for i,j in ipairs(sub) do
             co.resume(j)
         end
@@ -243,10 +267,16 @@ end
 function start(f)
     local current = co.running()
     local sub = co.create(function()
+        local r = co.running()
         local sub_sub = co.create(f)
-        co.running().sub = sub_sub
+        r.sub = sub_sub
+        sub_sub.parent = r
+        children[r] = children[r] or {}
+        table.insert(children[r], sub_sub)
         co.resume(sub_sub)
-        co.yield()
+ --       if sub_sub.state ~= "dead" then
+            co.yield()
+--        end
     end)
     sub.node_done = function(handle)
         handle.sub.parent = nil
@@ -257,31 +287,24 @@ function start(f)
             co.resume(current)
         end
     end
+    if current then
+        sub.parent = current
+        children[current] = children[current] or {}
+        table.insert(children[current], sub)
+    end
     co.resume(sub)
+    if sub.state ~= "dead" then
+        co.yield()
+    end
 end
 
 function pe()
     he = co.running()
     print("ini e")
---[[
-    pe_sub = co.create(function()
-        pe_sub_sub = co.create(par_or(pf, pg))
-        co.running().sub = pe_sub_sub
-        co.resume(pe_sub_sub)
-        co.yield()
-    end)
-    pe_sub.node_done = function(handle)
-        handle.sub.parent = nil
-        handle.sub.node_done(handle.sub)
-        co.kill(handle.sub)
-        co.resume(he)
-    end
-    co.resume(pe_sub)
---]]
 
     start(par_or(pf, pg))
-    print("antes yield")
-    co.yield()
+--    print("antes yield")
+--    co.yield()
     print("fim e")
 end
 
@@ -311,6 +334,17 @@ function pi()
     print("fim i")
 end
 
+function pj()
+    hj = co.running()
+    print("ini j")
+
+    start(par_or(pf, ph))
+    print("antes yield")
+    co.yield()
+    print("fim j")
+end
+
+
 function main()
 --    par_or(pa, pb)()
 --    par_or(par_or(pa, pb), pc)()
@@ -328,7 +362,9 @@ end
 --co.wrap(main)()
 --co.resume(ha)
 
+start(par_or(par_or(pa, pb), pj))
 --start(par_or(par_or(pa, pb), pe))
 --start(par_and(pa, par_or(par_or(pb, pc), ph)))
 --start(par_or(par_and(pa, pb), ph))
-start(par_or(par_or(pb, pi), pa))
+--start(par_or(par_or(pb, pi), pa))
+--start(par_or(pa, par_and(ph, pb)))

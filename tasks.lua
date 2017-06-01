@@ -274,9 +274,9 @@ function start(f)
         children[r] = children[r] or {}
         table.insert(children[r], sub_sub)
         co.resume(sub_sub)
- --       if sub_sub.state ~= "dead" then
+        if sub_sub.state ~= "dead" then
             co.yield()
---        end
+        end
     end)
     sub.node_done = function(handle)
         handle.sub.parent = nil
@@ -339,9 +339,15 @@ function pj()
     print("ini j")
 
     start(par_or(pf, ph))
-    print("antes yield")
-    co.yield()
     print("fim j")
+end
+
+function pk()
+    hk = co.running()
+    print("ini k")
+
+    start(par_and(pf, ph))
+    print("fim k")
 end
 
 
@@ -362,7 +368,11 @@ end
 --co.wrap(main)()
 --co.resume(ha)
 
-start(par_or(par_or(pa, pb), pj))
+start(par_or(par_or(pa, pb), pk))
+co.resume(ha)
+print("hf.state: "..hf.state, "<- should be 'dead'")
+print("hk.state: "..hk.state, "<- should be 'dead'")
+--start(par_or(par_or(pa, pb), pj))
 --start(par_or(par_or(pa, pb), pe))
 --start(par_and(pa, par_or(par_or(pb, pc), ph)))
 --start(par_or(par_and(pa, pb), ph))

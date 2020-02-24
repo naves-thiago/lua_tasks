@@ -107,7 +107,7 @@ function par_or(t1, t2)
 	local task = task_t:new(function() t1(true) t2(true) await(uuid) end)
 	t1.done:listen(either_done)
 	t2.done:listen(either_done)
-	task()
+	return task
 end
 
 -- Test code
@@ -115,6 +115,8 @@ function fa() print("ta ini") await(1) print("ta fim") end
 ta = task_t:new(fa, "A")
 function fb() print("tb ini") await(2) print("tb fim") end
 tb = task_t:new(fb, "B")
-function fc() print("tc ini") par_or(ta, tb) print("tc fim") await(3) print("tc fim 2") end
+function fc() print("tc ini") await(3) print("tc fim") end
 tc = task_t:new(fc, "C")
-tc()
+function fd() print("td ini") par_or(ta, par_or(tb, tc))() print("td fim") await(4) print("td fim 2") end
+td = task_t:new(fd, "D")
+td()

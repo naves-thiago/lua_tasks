@@ -40,7 +40,8 @@ function task_t:new(f, name)
 	return setmetatable(t, {__index = self, __call = self.__call})
 end
 
-function task_t:__call()
+-- If no_wait is true, the caller will not yield to wait for this task to complete
+function task_t:__call(no_await)
 	if self.state ~= "ready" then
 		return
 	end
@@ -53,6 +54,11 @@ function task_t:__call()
 		self.parent.done:listen(function() self:kill() end)
 	end
 	coroutine.resume(self.coroutine)
+	if self.parent and not no_await then
+		-- Started from another task
+		self.done:listen(function() emit(self) end)
+		await(self)
+	end
 end
 
 function task_t:kill()
@@ -62,7 +68,6 @@ function task_t:kill()
 	end
 	self.state = "dead"
 	scheduler.current = self.parent
-	emit(self)
 	self.done()
 	self.f = nil
 	--print(self.name .. ' killed')
@@ -99,11 +104,10 @@ end
 function par_or(t1, t2)
 	local uuid = {} -- Unique event ID for this call
 	local either_done = function() emit(uuid) end
-	local task = task_t:new(function() t1() t2() await(uuid) end)
+	local task = task_t:new(function() t1(true) t2(true) await(uuid) end)
 	t1.done:listen(either_done)
 	t2.done:listen(either_done)
 	task()
-	await(task)
 end
 
 -- Test code

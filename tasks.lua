@@ -70,6 +70,7 @@ function task_t:kill()
 	self.coroutine = nil
 end
 
+-- Scheduler API
 scheduler = {current = nil, waiting = {}}
 function await(evt)
 	
@@ -82,12 +83,22 @@ function await(evt)
 	if not waiting[evt] then
 		waiting[evt] = event_t:new()
 	end
-	waiting[evt]:await(function() coroutine.resume(scheduler.current.coroutine) end)
-	coroutine.yield()
+	waiting[evt]:await(function(_, ...) coroutine.resume(scheduler.current.coroutine, ...) end)
+	return coroutine.yield()
 end
 
+function emit(evt, ...)
+	local e = scheduler.waiting[evt]
+	if e then
+		e(...)
+	end
+end
+
+--[[
+-- Test code
 function ta() print("ta ini") await(1) print("ta fim") end
 t2 = task_t:new(ta, "A")
 function tb() print("tb ini") t2() print("tb fim") end
 t = task_t:new(tb, "B")
 t()
+]]

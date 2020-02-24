@@ -1,4 +1,4 @@
-local dbg = require "debugger"
+--local dbg = require "debugger"
 -- Observer
 event_t = {}
 
@@ -53,6 +53,11 @@ function task_t:__call()
 		self.parent.done:listen(function() self:kill() end)
 	end
 	coroutine.resume(self.coroutine)
+	if self.parent then
+		-- Started from another task
+		self.done:listen(function() emit(self) end)
+		await(self)
+	end
 end
 
 function task_t:kill()
@@ -94,11 +99,9 @@ function emit(evt, ...)
 	end
 end
 
---[[
 -- Test code
 function ta() print("ta ini") await(1) print("ta fim") end
 t2 = task_t:new(ta, "A")
 function tb() print("tb ini") t2() print("tb fim") end
 t = task_t:new(tb, "B")
 t()
-]]

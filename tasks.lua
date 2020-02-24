@@ -40,7 +40,8 @@ function task_t:new(f, name)
 	return setmetatable(t, {__index = self, __call = self.__call})
 end
 
-function task_t:__call()
+-- If no_wait is true, the caller will not yield to wait for this task to complete
+function task_t:__call(no_await)
 	if self.state ~= "ready" then
 		return
 	end
@@ -53,7 +54,7 @@ function task_t:__call()
 		self.parent.done:listen(function() self:kill() end)
 	end
 	coroutine.resume(self.coroutine)
-	if self.parent then
+	if self.parent and not no_await then
 		-- Started from another task
 		self.done:listen(function() emit(self) end)
 		await(self)
@@ -78,7 +79,6 @@ end
 -- Scheduler API
 scheduler = {current = nil, waiting = {}}
 function await(evt)
-	
 	local waiting = scheduler.waiting
 	if not scheduler.current then
 		print("no task")
@@ -88,7 +88,9 @@ function await(evt)
 	if not waiting[evt] then
 		waiting[evt] = event_t:new()
 	end
-	waiting[evt]:await(function(_, ...) coroutine.resume(scheduler.current.coroutine, ...) end)
+	local curr = scheduler.current
+	waiting[evt]:await(function(_, ...) scheduler.current = curr coroutine.resume(curr.coroutine, ...) end)
+	scheduler.current = curr.parent
 	return coroutine.yield()
 end
 
@@ -99,9 +101,20 @@ function emit(evt, ...)
 	end
 end
 
+function par_or(t1, t2)
+	local uuid = {} -- Unique event ID for this call
+	local either_done = function() emit(uuid) end
+	local task = task_t:new(function() t1(true) t2(true) await(uuid) end)
+	t1.done:listen(either_done)
+	t2.done:listen(either_done)
+	task()
+end
+
 -- Test code
-function ta() print("ta ini") await(1) print("ta fim") end
-t2 = task_t:new(ta, "A")
-function tb() print("tb ini") t2() print("tb fim") end
-t = task_t:new(tb, "B")
-t()
+function fa() print("ta ini") await(1) print("ta fim") end
+ta = task_t:new(fa, "A")
+function fb() print("tb ini") await(2) print("tb fim") end
+tb = task_t:new(fb, "B")
+function fc() print("tc ini") par_or(ta, tb) print("tc fim") await(3) print("tc fim 2") end
+tc = task_t:new(fc, "C")
+tc()

@@ -89,7 +89,12 @@ function await(evt)
 		waiting[evt] = event_t:new()
 	end
 	local curr = scheduler.current
-	waiting[evt]:await(function(_, ...) scheduler.current = curr coroutine.resume(curr.coroutine, ...) end)
+	waiting[evt]:await(function(_, ...)
+			if curr.state ~= "dead" then
+				scheduler.current = curr coroutine.resume(curr.coroutine, ...)
+			end
+		end)
+
 	scheduler.current = curr.parent
 	return coroutine.yield()
 end

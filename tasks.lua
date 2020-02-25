@@ -1,7 +1,9 @@
---local dbg = require "debugger"
--- Observer
-event_t = {}
+local module = {}
+local event_t = {}
+local task_t = {}
+local scheduler = {current = nil, waiting = {}}
 
+-- Observer
 function event_t:new()
 	return setmetatable({listeners = {}, waiting = {}}, {__index = self, __call = self.__call})
 end
@@ -33,8 +35,6 @@ function event_t:__call(...)
 end
 
 -- Task
-task_t = {}
-
 function task_t:new(f, name)
 	local t = {f = f, done = event_t:new(), state = "ready", parent = nil, coroutine = nil, name = name or "??"}
 	return setmetatable(t, {__index = self, __call = self.__call})
@@ -50,7 +50,6 @@ function task_t:__call(no_await)
 	self.coroutine = coroutine.create(function() self.f() self:kill() end)
 	scheduler.current = self
 	if self.parent then
-		--self.parent.done:listen(function() print(self.name .. ": killed by parent ("..self.parent.name..")") self:kill() end)
 		self.parent.done:listen(function() self:kill() end)
 	end
 	coroutine.resume(self.coroutine)
@@ -62,7 +61,6 @@ function task_t:__call(no_await)
 end
 
 function task_t:kill()
-	--print('Kill ' .. self.name .. ' (' .. self.state .. ')')
 	if self.state == "dead" then
 		return
 	end
@@ -70,18 +68,15 @@ function task_t:kill()
 	scheduler.current = self.parent
 	self.done()
 	self.f = nil
-	--print(self.name .. ' killed')
 	self.done = nil
 	self.parent = nil
 	self.coroutine = nil
 end
 
 -- Scheduler API
-scheduler = {current = nil, waiting = {}}
-function await(evt)
+local function await(evt)
 	local waiting = scheduler.waiting
 	if not scheduler.current then
-		print("no task")
 		return
 	end
 
@@ -99,14 +94,14 @@ function await(evt)
 	return coroutine.yield()
 end
 
-function emit(evt, ...)
+local function emit(evt, ...)
 	local e = scheduler.waiting[evt]
 	if e then
 		e(...)
 	end
 end
 
-function par_or(t1, t2)
+local function par_or(t1, t2)
 	local uuid = {} -- Unique event ID for this call
 	local either_done = function() emit(uuid) end
 	local task = task_t:new(function() t1(true) t2(true) await(uuid) end)
@@ -115,7 +110,7 @@ function par_or(t1, t2)
 	return task
 end
 
-function par_and(t1, t2)
+local function par_and(t1, t2)
 	local uuid = {}
 	local pending = 2
 	local done_cb = function()
@@ -130,27 +125,11 @@ function par_and(t1, t2)
 	return task_t:new(function() t1(true) t2(true) await(uuid) end)
 end
 
--- Test code
-function fa() print("ta ini") await(1) print("ta fim") end
-ta = task_t:new(fa, "A")
-function fb() print("tb ini") await(2) print("tb fim") end
-tb = task_t:new(fb, "B")
-function fc() print("tc ini") await(3) print("tc fim") end
-tc = task_t:new(fc, "C")
-function fd() print("td ini") await(4) print("td fim") end
-td = task_t:new(fd, "D")
-function fe() print("te ini") par_or(par_and(td, tc), par_or(ta, tb))() print("te fim") await(5) print("te fim 2") end
-te = task_t:new(fe, "E")
-te()
+module.event_t = event_t
+module.task_t = task_t
+module.await = await
+module.emit = emit
+module.par_or = par_or
+module.par_and = par_and
 
---[[
-function fa() print("ta ini") await(1) print("ta fim") end
-ta = task_t:new(fa, "A")
-function fb() print("tb ini") await(2) print("tb fim") end
-tb = task_t:new(fb, "B")
-function fc() print("tc ini") await(3) print("tc fim") end
-tc = task_t:new(fc, "C")
-function fd() print("td ini") par_or(ta, par_or(tb, tc))() print("td fim") await(4) print("td fim 2") end
-td = task_t:new(fd, "D")
-td()
---]]
+return module

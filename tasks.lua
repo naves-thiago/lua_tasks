@@ -115,7 +115,35 @@ function par_or(t1, t2)
 	return task
 end
 
+function par_and(t1, t2)
+	local uuid = {}
+	local pending = 2
+	local done_cb = function()
+			pending = pending - 1
+			if pending == 0 then
+				emit(uuid)
+			end
+		end
+
+	t1.done:listen(done_cb)
+	t2.done:listen(done_cb)
+	return task_t:new(function() t1(true) t2(true) await(uuid) end)
+end
+
 -- Test code
+function fa() print("ta ini") await(1) print("ta fim") end
+ta = task_t:new(fa, "A")
+function fb() print("tb ini") await(2) print("tb fim") end
+tb = task_t:new(fb, "B")
+function fc() print("tc ini") await(3) print("tc fim") end
+tc = task_t:new(fc, "C")
+function fd() print("td ini") await(4) print("td fim") end
+td = task_t:new(fd, "D")
+function fe() print("te ini") par_or(par_and(td, tc), par_or(ta, tb))() print("te fim") await(5) print("te fim 2") end
+te = task_t:new(fe, "E")
+te()
+
+--[[
 function fa() print("ta ini") await(1) print("ta fim") end
 ta = task_t:new(fa, "A")
 function fb() print("tb ini") await(2) print("tb fim") end
@@ -125,3 +153,4 @@ tc = task_t:new(fc, "C")
 function fd() print("td ini") par_or(ta, par_or(tb, tc))() print("td fim") await(4) print("td fim 2") end
 td = task_t:new(fd, "D")
 td()
+--]]

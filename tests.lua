@@ -6,7 +6,7 @@ tests = {}
 function emit_without_await_does_nothing()
 	local x = 0
 	local function fa() await(1) x = 1 end
-	local ta = task_t:new(fa, "A")
+	local ta = task_t:new(fa)
 	ta()
 	emit(2)
 	assert(x == 0)
@@ -14,6 +14,63 @@ function emit_without_await_does_nothing()
 end
 table.insert(tests, emit_without_await_does_nothing)
 
+function emit_unblocks_await()
+	local x = 0
+	local function fa() await(1) x = 1 end
+	local ta = task_t:new(fa)
+	ta()
+	assert(x == 0)
+	assert(ta.state == "alive")
+	emit(1)
+	assert(x == 1)
+	assert(ta.state == "dead")
+end
+table.insert(tests, emit_unblocks_await)
+
+function inner_task_blocks_outer_task()
+	local x = 0
+	local ta = task_t:new(function() await(1) end)
+	local tb = task_t:new(function() ta() x = 1 end)
+	tb()
+	assert(x == 0)
+	assert(ta.state == "alive")
+	assert(tb.state == "alive")
+	emit(1)
+	assert(x == 1)
+	assert(ta.state == "dead")
+	assert(tb.state == "dead")
+end
+table.insert(tests, inner_task_blocks_outer_task)
+
+function outer_task_kills_inner_task()
+	local x = 0
+	local ta = task_t:new(function() await(1) end)
+	local tb = task_t:new(function() ta() x = 1 end)
+	tb()
+	assert(x == 0)
+	assert(ta.state == "alive")
+	assert(tb.state == "alive")
+	tb:kill()
+	assert(x == 0)
+	assert(ta.state == "dead")
+	assert(tb.state == "dead")
+end
+table.insert(tests, outer_task_kills_inner_task)
+
+function task_no_wait_execution()
+	local x = 0
+	local ta = task_t:new(function() await(1) end)
+	local tb = task_t:new(function() ta(true) await(2) x = 1 end)
+	tb()
+	assert(x == 0)
+	assert(ta.state == "alive")
+	assert(tb.state == "alive")
+	emit(2)
+	assert(x == 1)
+	assert(ta.state == "dead")
+	assert(tb.state == "dead")
+end
+table.insert(tests, task_no_wait_execution)
 
 ------------------------------------------------------
 
@@ -26,6 +83,18 @@ for name, f in pairs(_ENV) do
 	if fname[f] then
 		fname[f] = name
 	end
+end
+
+-- Check command line args
+if #arg > 0 then
+	local t = {}
+	for _, name in ipairs(arg) do
+		local f = _ENV[name]
+		if type(f) == "function" then
+			table.insert(t, f)
+		end
+	end
+	tests = t
 end
 
 local test_count = #tests

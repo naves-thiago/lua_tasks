@@ -103,18 +103,26 @@ local function emit(evt, ...)
 	end
 end
 
-local function par_or(t1, t2)
-	local uuid = {} -- Unique event ID for this call
-	local either_done = function() emit(uuid) end
-	local task = task_t:new(function() t1(true) t2(true) await(uuid) end)
-	t1.done:listen(either_done)
-	t2.done:listen(either_done)
+local function par_or(...)
+	local tasks = {...}
+	local uuid = tasks -- Reuse the taskts table as an unique event ID for this call
+	local done_cb = function() emit(uuid) end
+	local task = task_t:new(function()
+			for _, t in ipairs(tasks) do
+				t(true)
+			end
+			await(uuid)
+		end)
+	for _, t in ipairs(tasks) do
+		t.done:listen(done_cb)
+	end
 	return task
 end
 
-local function par_and(t1, t2)
-	local uuid = {}
-	local pending = 2
+local function par_and(...)
+	local tasks = {...}
+	local uuid = tasks -- Reuse the taskts table as an unique event ID for this call
+	local pending = #tasks
 	local done_cb = function()
 			pending = pending - 1
 			if pending == 0 then
@@ -122,9 +130,15 @@ local function par_and(t1, t2)
 			end
 		end
 
-	t1.done:listen(done_cb)
-	t2.done:listen(done_cb)
-	return task_t:new(function() t1(true) t2(true) await(uuid) end)
+	for _, t in ipairs(tasks) do
+		t.done:listen(done_cb)
+	end
+	return task_t:new(function()
+			for _, t in ipairs(tasks) do
+				t(true)
+			end
+			await(uuid)
+		end)
 end
 
 module.event_t = event_t

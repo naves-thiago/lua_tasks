@@ -517,6 +517,62 @@ function three_nested_ands()
 end
 table.insert(tests, three_nested_ands)
 
+function par_or_three_tasks()
+	for i = 1, 3 do
+		local x = 0
+		local ta = task_t:new(function() await(1) end)
+		local tb = task_t:new(function() await(2) end)
+		local tc = task_t:new(function() await(3) end)
+		local td = task_t:new(function() par_or(ta, tb, tc)() x = 1 end)
+		td()
+		assert(x == 0)
+		assert(ta.state == "alive")
+		assert(tb.state == "alive")
+		assert(tc.state == "alive")
+		assert(td.state == "alive")
+		emit(i)
+		assert(x == 1)
+		assert(ta.state == "dead")
+		assert(tb.state == "dead")
+		assert(tc.state == "dead")
+		assert(td.state == "dead")
+	end
+end
+table.insert(tests, par_or_three_tasks)
+
+function par_and_three_tasks()
+	local x = 0
+	local ta = task_t:new(function() await(1) end)
+	local tb = task_t:new(function() await(2) end)
+	local tc = task_t:new(function() await(3) end)
+	local td = task_t:new(function() par_and(ta, tb, tc)() x = 1 end)
+	td()
+	assert(x == 0)
+	assert(ta.state == "alive")
+	assert(tb.state == "alive")
+	assert(tc.state == "alive")
+	assert(td.state == "alive")
+	emit(1)
+	assert(x == 0)
+	assert(ta.state == "dead")
+	assert(tb.state == "alive")
+	assert(tc.state == "alive")
+	assert(td.state == "alive")
+	emit(2)
+	assert(x == 0)
+	assert(ta.state == "dead")
+	assert(tb.state == "dead")
+	assert(tc.state == "alive")
+	assert(td.state == "alive")
+	emit(3)
+	assert(x == 1)
+	assert(ta.state == "dead")
+	assert(tb.state == "dead")
+	assert(tc.state == "dead")
+	assert(td.state == "dead")
+end
+table.insert(tests, par_and_three_tasks)
+
 ------------------------------------------------------
 
 -- Get function names

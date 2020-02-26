@@ -65,8 +65,10 @@ function task_t:kill()
 		return
 	end
 	self.state = "dead"
-	scheduler.current = self.parent
 	self.done()
+	if scheduler.current == self then
+		scheduler.current = self.parent
+	end
 	self.f = nil
 	self.done = nil
 	self.parent = nil

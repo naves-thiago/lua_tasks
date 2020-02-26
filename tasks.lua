@@ -105,6 +105,11 @@ end
 
 local function par_or(...)
 	local tasks = {...}
+	for i, v in ipairs(tasks) do
+		if type(v) == "function" then
+			tasks[i] = task_t:new(v)
+		end
+	end
 	local uuid = tasks -- Reuse the taskts table as an unique event ID for this call
 	local done_cb = function() emit(uuid) end
 	local task = task_t:new(function()
@@ -121,6 +126,11 @@ end
 
 local function par_and(...)
 	local tasks = {...}
+	for i, v in ipairs(tasks) do
+		if type(v) == "function" then
+			tasks[i] = task_t:new(v)
+		end
+	end
 	local uuid = tasks -- Reuse the taskts table as an unique event ID for this call
 	local pending = #tasks
 	local done_cb = function()

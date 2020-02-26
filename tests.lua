@@ -573,6 +573,30 @@ function par_and_three_tasks()
 end
 table.insert(tests, par_and_three_tasks)
 
+function par_or_function_parameter()
+	local x, y = 0, 0
+	local function fx() x = 1 await(1) end
+	local function fy() y = 2 await(1) end
+	local p = par_or(fx, fy)
+	p()
+	assert(x == 1)
+	assert(y == 2)
+	p:kill()
+end
+table.insert(tests, par_or_function_parameter)
+
+function par_and_function_parameter()
+	local x, y = 0, 0
+	local function fx() x = 1 await(1) end
+	local function fy() y = 2 await(1) end
+	local p = par_and(fx, fy)
+	p()
+	assert(x == 1)
+	assert(y == 2)
+	p:kill()
+end
+table.insert(tests, par_and_function_parameter)
+
 ------------------------------------------------------
 
 -- Get function names

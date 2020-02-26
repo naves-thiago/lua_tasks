@@ -72,6 +72,69 @@ function task_no_wait_execution()
 end
 table.insert(tests, task_no_wait_execution)
 
+function par_or_finishes_with_either()
+	for i = 1, 2 do
+		local x = 0
+		local ta = task_t:new(function() await(1) end)
+		local tb = task_t:new(function() await(2) end)
+		local tc = task_t:new(function() par_or(ta, tb)() x = 1 end)
+		tc()
+		assert(x == 0, "i = " .. i)
+		assert(ta.state == "alive", "i = " .. i)
+		assert(tb.state == "alive", "i = " .. i)
+		assert(tc.state == "alive", "i = " .. i)
+		emit(i)
+		assert(x == 1, "i = " .. i)
+		assert(ta.state == "dead", "i = " .. i)
+		assert(tb.state == "dead", "i = " .. i)
+		assert(tc.state == "dead", "i = " .. i)
+	end
+end
+table.insert(tests, par_or_finishes_with_either)
+
+function par_and_finishes_with_both()
+	-- ta finishes first
+	local x = 0
+	local ta = task_t:new(function() await(1) end)
+	local tb = task_t:new(function() await(2) end)
+	local tc = task_t:new(function() par_and(ta, tb)() x = 1 end)
+	tc()
+	assert(x == 0)
+	assert(ta.state == "alive")
+	assert(tb.state == "alive")
+	assert(tc.state == "alive")
+	emit(1)
+	assert(x == 0)
+	assert(ta.state == "dead")
+	assert(tb.state == "alive")
+	assert(tc.state == "alive")
+	emit(2)
+	assert(x == 1)
+	assert(tb.state == "dead")
+	assert(tc.state == "dead")
+
+	-- tb finishes first
+	x = 0
+	ta = task_t:new(function() await(1) end)
+	tb = task_t:new(function() await(2) end)
+	tc = task_t:new(function() par_and(ta, tb)() x = 1 end)
+	tc()
+	assert(x == 0)
+	assert(ta.state == "alive")
+	assert(tb.state == "alive")
+	assert(tc.state == "alive")
+	emit(2)
+	assert(x == 0)
+	assert(ta.state == "alive")
+	assert(tb.state == "dead")
+	assert(tc.state == "alive")
+	emit(1)
+	assert(x == 1)
+	assert(tb.state == "dead")
+	assert(tc.state == "dead")
+end
+table.insert(tests, par_and_finishes_with_both)
+
 ------------------------------------------------------
 
 -- Get function names

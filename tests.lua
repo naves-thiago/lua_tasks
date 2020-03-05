@@ -597,6 +597,45 @@ function par_and_function_parameter()
 end
 table.insert(tests, par_and_function_parameter)
 
+function independent_subtask()
+    local function fa() await(1) end
+    local ta = task_t:new(fa)
+    local function fb() ta(false, true) end
+    local tb = task_t:new(fb)
+    tb()
+    assert(ta.state == "alive")
+    assert(tb.state == "alive")
+    tb:kill()
+    assert(ta.state == "alive")
+    assert(tb.state == "dead")
+    ta:kill()
+    assert(ta.state == "dead")
+
+    function fa() await(1) end
+    ta = task_t:new(fa)
+    function fb() ta(true, true) end
+    tb = task_t:new(fb)
+    tb()
+    assert(ta.state == "alive")
+    assert(tb.state == "dead")
+    ta:kill()
+    assert(ta.state == "dead")
+end
+table.insert(tests, independent_subtask)
+
+function disown_subtask()
+    local function fa() await(1) end
+    local ta = task_t:new(fa)
+    local function fb() ta(true) ta:disown() end
+    local tb = task_t:new(fb)
+    tb()
+    assert(ta.state == "alive")
+    assert(tb.state == "dead")
+    ta:kill()
+    assert(ta.state == "dead")
+end
+table.insert(tests, disown_subtask)
+
 ------------------------------------------------------
 
 -- Get function names
@@ -635,17 +674,3 @@ for index, func in ipairs(tests) do
 		print(debug.traceback(c, message))
 	end
 end
-
---[[
-function fa() print("ta ini") await(1) print("ta fim") end
-ta = task_t:new(fa, "A")
-function fb() print("tb ini") await(2) print("tb fim") end
-tb = task_t:new(fb, "B")
-function fc() print("tc ini") await(3) print("tc fim") end
-tc = task_t:new(fc, "C")
-function fd() print("td ini") await(4) print("td fim") end
-td = task_t:new(fd, "D")
-function fe() print("te ini") par_or(par_and(td, tc), par_or(ta, tb))() print("te fim") await(5) print("te fim 2") end
-te = task_t:new(fe, "E")
-te()
---]]

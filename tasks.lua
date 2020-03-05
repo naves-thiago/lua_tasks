@@ -41,7 +41,7 @@ function task_t:new(f, name)
 end
 
 -- If no_wait is true, the caller will not yield to wait for this task to complete
-function task_t:__call(no_await)
+function task_t:__call(no_await, independent)
 	if self.state ~= "ready" then
 		return
 	end
@@ -49,8 +49,9 @@ function task_t:__call(no_await)
 	self.parent = scheduler.current
 	self.coroutine = coroutine.create(function() self.f() self:kill() end)
 	scheduler.current = self
-	if self.parent then
-		self.parent.done:listen(function() self:kill() end)
+	if self.parent and not independent then
+		self.suicide_cb = function() self:kill() end
+		self.parent.done:listen(self.suicide_cb)
 	end
 	coroutine.resume(self.coroutine)
 	if self.parent and not no_await then
@@ -73,6 +74,15 @@ function task_t:kill()
 	self.done = nil
 	self.parent = nil
 	self.coroutine = nil
+end
+
+function task_t:disown()
+    if self.parent == nil then
+        return
+    end
+    self.parent.done:remove_listener(self.suicide_cb)
+    self.parent = nil
+    self.suicide_cb = nil
 end
 
 -- Scheduler API

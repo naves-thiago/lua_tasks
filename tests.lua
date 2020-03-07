@@ -2,6 +2,10 @@ local tasks = require"tasks"
 setmetatable(_ENV, {__index = tasks})
 
 tests = {}
+function tests.add(f)
+	assert(type(f) == "function")
+	table.insert(tests, f)
+end
 
 function tasks_start_with_state_ready()
 	local ta = task_t:new(function() end)
@@ -13,7 +17,7 @@ function tasks_start_with_state_ready()
 	assert(por.state == "ready")
 	assert(pand.state == "ready")
 end
-table.insert(tests, tasks_start_with_state_ready)
+tests.add(tasks_start_with_state_ready)
 
 function emit_without_await_does_nothing()
 	local x = 0
@@ -24,7 +28,7 @@ function emit_without_await_does_nothing()
 	assert(x == 0)
 	assert(ta.state == "alive")
 end
-table.insert(tests, emit_without_await_does_nothing)
+tests.add(emit_without_await_does_nothing)
 
 function emit_unblocks_await()
 	local x = 0
@@ -37,7 +41,7 @@ function emit_unblocks_await()
 	assert(x == 1)
 	assert(ta.state == "dead")
 end
-table.insert(tests, emit_unblocks_await)
+tests.add(emit_unblocks_await)
 
 function inner_task_blocks_outer_task()
 	local x = 0
@@ -52,7 +56,7 @@ function inner_task_blocks_outer_task()
 	assert(ta.state == "dead")
 	assert(tb.state == "dead")
 end
-table.insert(tests, inner_task_blocks_outer_task)
+tests.add(inner_task_blocks_outer_task)
 
 function outer_task_kills_inner_task()
 	local x = 0
@@ -67,7 +71,7 @@ function outer_task_kills_inner_task()
 	assert(ta.state == "dead")
 	assert(tb.state == "dead")
 end
-table.insert(tests, outer_task_kills_inner_task)
+tests.add(outer_task_kills_inner_task)
 
 function task_no_wait_execution()
 	local x = 0
@@ -82,7 +86,7 @@ function task_no_wait_execution()
 	assert(ta.state == "dead")
 	assert(tb.state == "dead")
 end
-table.insert(tests, task_no_wait_execution)
+tests.add(task_no_wait_execution)
 
 function par_or_finishes_with_either()
 	for i = 1, 2 do
@@ -102,7 +106,7 @@ function par_or_finishes_with_either()
 		assert(tc.state == "dead", "i = " .. i)
 	end
 end
-table.insert(tests, par_or_finishes_with_either)
+tests.add(par_or_finishes_with_either)
 
 function par_and_finishes_with_both()
 	-- ta finishes first
@@ -145,7 +149,7 @@ function par_and_finishes_with_both()
 	assert(tb.state == "dead")
 	assert(tc.state == "dead")
 end
-table.insert(tests, par_and_finishes_with_both)
+tests.add(par_and_finishes_with_both)
 
 function nested_par_or()
 	-- ta finishes first
@@ -186,7 +190,7 @@ function nested_par_or()
 	assert(tc.state == "dead")
 	assert(td.state == "dead")
 end
-table.insert(tests, nested_par_or)
+tests.add(nested_par_or)
 
 function nested_par_and()
 	-- ta finishes first
@@ -251,7 +255,7 @@ function nested_par_and()
 	assert(tc.state == "dead")
 	assert(td.state == "dead")
 end
-table.insert(tests, nested_par_and)
+tests.add(nested_par_and)
 
 function par_and_in_par_or()
 	-- ta finishes first
@@ -298,7 +302,7 @@ function par_and_in_par_or()
 	assert(tc.state == "dead")
 	assert(td.state == "dead")
 end
-table.insert(tests, par_and_in_par_or)
+tests.add(par_and_in_par_or)
 
 function par_or_in_par_and()
 	-- ta finishes first
@@ -357,7 +361,7 @@ function par_or_in_par_and()
 	assert(tc.state == "dead")
 	assert(td.state == "dead")
 end
-table.insert(tests, par_and_in_par_or)
+tests.add(par_and_in_par_or)
 
 function three_nested_ors()
 	for i = 1, 4 do
@@ -383,7 +387,7 @@ function three_nested_ors()
 		assert(te.state == "dead")
 	end
 end
-table.insert(tests, three_nested_ors)
+tests.add(three_nested_ors)
 
 function three_nested_ands()
 	-- Outer first
@@ -515,7 +519,7 @@ function three_nested_ands()
 	assert(td.state == "dead")
 	assert(te.state == "dead")
 end
-table.insert(tests, three_nested_ands)
+tests.add(three_nested_ands)
 
 function par_or_three_tasks()
 	for i = 1, 3 do
@@ -538,7 +542,7 @@ function par_or_three_tasks()
 		assert(td.state == "dead")
 	end
 end
-table.insert(tests, par_or_three_tasks)
+tests.add(par_or_three_tasks)
 
 function par_and_three_tasks()
 	local x = 0
@@ -571,7 +575,7 @@ function par_and_three_tasks()
 	assert(tc.state == "dead")
 	assert(td.state == "dead")
 end
-table.insert(tests, par_and_three_tasks)
+tests.add(par_and_three_tasks)
 
 function par_or_function_parameter()
 	local x, y = 0, 0
@@ -583,7 +587,7 @@ function par_or_function_parameter()
 	assert(y == 2)
 	p:kill()
 end
-table.insert(tests, par_or_function_parameter)
+tests.add(par_or_function_parameter)
 
 function par_and_function_parameter()
 	local x, y = 0, 0
@@ -595,7 +599,7 @@ function par_and_function_parameter()
 	assert(y == 2)
 	p:kill()
 end
-table.insert(tests, par_and_function_parameter)
+tests.add(par_and_function_parameter)
 
 function independent_subtask()
     local function fa() await(1) end
@@ -621,7 +625,7 @@ function independent_subtask()
     ta:kill()
     assert(ta.state == "dead")
 end
-table.insert(tests, independent_subtask)
+tests.add(independent_subtask)
 
 function disown_subtask()
     local function fa() await(1) end
@@ -634,7 +638,7 @@ function disown_subtask()
     ta:kill()
     assert(ta.state == "dead")
 end
-table.insert(tests, disown_subtask)
+tests.add(disown_subtask)
 
 ------------------------------------------------------
 
@@ -662,6 +666,7 @@ if #arg > 0 then
 end
 
 local test_count = #tests
+local failed = 0
 -- Run the tests
 for index, func in ipairs(tests) do
 	io.stdout:write(string.format("%s (%d/%d): ", fname[func], index, test_count))
@@ -670,7 +675,15 @@ for index, func in ipairs(tests) do
 	if success then
 		print("OK")
 	else
+		failed = failed + 1
 		print("FAILED")
 		print(debug.traceback(c, message))
 	end
+end
+
+print("-------------------------------------------")
+if failed == 0 then
+	print("All tests were successfull")
+else
+	print(failed .. " tests failed")
 end

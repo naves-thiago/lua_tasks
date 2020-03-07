@@ -88,7 +88,8 @@ local function await(evt)
 	local curr = scheduler.current
 	waiting[evt]:await(function(_, ...)
 			if curr.state ~= "dead" then
-				scheduler.current = curr coroutine.resume(curr.coroutine, ...)
+				scheduler.current = curr
+				coroutine.resume(curr.coroutine, ...)
 			end
 		end)
 

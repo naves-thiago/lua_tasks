@@ -9,29 +9,24 @@ function event_t:new()
 end
 
 function event_t:listen(f)
-	self.listeners[f] = true
+	self.listeners[f] = "repeat"
 end
 
 function event_t:await(f)
-	self.waiting[f] = true
+	self.listeners[f] = "once"
 end
 
 function event_t:remove_listener(f)
 	self.listeners[f] = nil
 end
 
-function event_t:remove_await(f)
-	self.waiting[f] = nil
-end
-
 function event_t:__call(...)
-	for l in pairs(self.listeners) do
+	for l, mode in pairs(self.listeners) do
 		l(self, ...)
+		if mode == "once" then
+			self.listeners[l] = nil
+		end
 	end
-	for l in pairs(self.waiting) do
-		l(self, ...)
-	end
-	self.waiting = {}
 end
 
 -- Task
@@ -162,11 +157,31 @@ local function par_and(...)
 		end)
 end
 
+local function listen(evt, callback, once)
+	local event = scheduler.waiting[evt] or event_t:new()
+	scheduler.waiting[evt] = event
+	if once then
+		event:await(callback)
+	else
+		event:listen(callback)
+	end
+end
+
+local function stop_listening(evt, callback)
+	if not scheduler.waiting[evt] then
+		return
+	end
+	scheduler.waiting[evt]:remove_listener(callback)
+end
+
+-- Module API
 module.event_t = event_t
 module.task_t = task_t
 module.await = await
 module.emit = emit
 module.par_or = par_or
 module.par_and = par_and
+module.listen = listen
+module.stop_listening = stop_listening
 
 return module

@@ -640,6 +640,39 @@ function disown_subtask()
 end
 tests.add(disown_subtask)
 
+function listen_repeat()
+	local flag = false
+	local function fa() flag = true end
+	listen(1, fa)
+	assert(flag == false)
+	emit(1)
+	assert(flag == true)
+	flag = false
+	emit(1)
+	assert(flag == true)
+	flag = false
+	stop_listening(1, fa)
+	emit(1)
+	assert(flag == false)
+end
+tests.add(listen_repeat)
+
+function listen_once()
+	local flag = false
+	local function fa() flag = true end
+	listen(1, fa, true)
+	assert(flag == false)
+	emit(1)
+	assert(flag == true)
+	flag = false
+	emit(1)
+	assert(flag == false)
+	stop_listening(1, fa)
+	emit(1)
+	assert(flag == false)
+end
+tests.add(listen_once)
+
 ------------------------------------------------------
 
 -- Get function names

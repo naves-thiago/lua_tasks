@@ -43,6 +43,21 @@ function emit_unblocks_await()
 end
 tests.add(emit_unblocks_await)
 
+function await_returns_emit_params()
+	local a, b
+	local function fa() a, b = await(1) end
+	local ta = task_t:new(fa)
+	ta()
+	assert(ta.state == "alive")
+	assert(a == nil)
+	assert(b == nil)
+	emit(1, 2, 3)
+	assert(ta.state == "dead")
+	assert(a == 2)
+	assert(b == 3)
+end
+tests.add(await_returns_emit_params)
+
 function inner_task_blocks_outer_task()
 	local x = 0
 	local ta = task_t:new(function() await(1) end)

@@ -769,6 +769,7 @@ function future_get_cancelled()
 	assert(a == nil)
 	assert(b == 1)
 	assert(f:is_cancelled())
+	assert(not f:is_done())
 end
 tests.add(future_get_cancelled)
 
@@ -790,6 +791,19 @@ function future_get_cancelled_ignores_event()
 	assert(f:is_cancelled())
 end
 tests.add(future_get_cancelled_ignores_event)
+
+function future_cancel_done()
+	local f = future_t:new(1)
+	assert(not f:is_done())
+	assert(not f:is_cancelled())
+	emit(1)
+	assert(f:is_done())
+	assert(not f:is_cancelled())
+	f:cancel()
+	assert(f:is_done())
+	assert(not f:is_cancelled())
+end
+tests.add(future_cancel_done)
 
 ------------------------------------------------------
 

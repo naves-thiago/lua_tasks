@@ -6,11 +6,11 @@ local scheduler = {current = nil, waiting = {}}
 
 -- Param forwarding
 local function pack(...)
-	return {select("#", pack), ...}
+	return {[0]=select("#", ...), ...}
 end
 
 local function unpack(t)
-	return table.unpack(t, 2, t[1] + 1)
+	return table.unpack(t, 1, t[0])
 end
 
 -- Observer
@@ -52,18 +52,22 @@ function task_t:__call(no_await, independent)
 	end
 	self.state = "alive"
 	self.parent = scheduler.current
-	self.coroutine = coroutine.create(function() self.f() self:kill() end)
+	self.coroutine = coroutine.create(function() local res = pack(self.f()) self:kill() return res end)
 	scheduler.current = self
 	if self.parent and not independent then
 		self.suicide_cb = function() self:kill() end
 		self.parent.done:listen(self.suicide_cb)
 	end
-	coroutine.resume(self.coroutine)
+	local success, output = coroutine.resume(self.coroutine)
 	if self.parent and not no_await then
 		-- Started from another task
 		self.done:listen(function() emit(self) end)
 		await(self)
 	end
+	if success and output then
+		return unpack(output)
+	end
+	-- TODO handle errors
 end
 
 function task_t:kill()
@@ -238,5 +242,7 @@ module.par_or = par_or
 module.par_and = par_and
 module.listen = listen
 module.stop_listening = stop_listening
+module.pack = pack
+module.unpack = unpack
 
 return module

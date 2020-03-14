@@ -733,10 +733,7 @@ function future_get_multiple_returns()
 	local fa = function()
 		local f = future_t:new(1)
 		a = 1
-		local function b(...)
-			a = {select("#", ...), ...}
-		end
-		b(f:get())
+		a = pack(f:get())
 	end
 	local ta = task_t:new(fa)
 	ta()
@@ -744,13 +741,13 @@ function future_get_multiple_returns()
 	assert(ta.state == "alive")
 	emit(1, 2, nil, 3, nil, 4, nil)
 
-	assert(a[1] == 6)
-	assert(a[2] == 2)
-	assert(a[3] == nil)
-	assert(a[4] == 3)
-	assert(a[5] == nil)
-	assert(a[6] == 4)
-	assert(a[7] == nil)
+	assert(a[0] == 6)
+	assert(a[1] == 2)
+	assert(a[2] == nil)
+	assert(a[3] == 3)
+	assert(a[4] == nil)
+	assert(a[5] == 4)
+	assert(a[6] == nil)
 	assert(ta.state == "dead")
 end
 tests.add(future_get_multiple_returns)
@@ -804,6 +801,19 @@ function future_cancel_done()
 	assert(not f:is_cancelled())
 end
 tests.add(future_cancel_done)
+
+function task_return_value()
+	local ta = task_t:new(function() return 1, nil, 2, nil, 3, nil end)
+	local r = pack(ta())
+	assert(r[0] == 6)
+	assert(r[1] == 1)
+	assert(r[2] == nil)
+	assert(r[3] == 2)
+	assert(r[4] == nil)
+	assert(r[5] == 3)
+	assert(r[6] == nil)
+end
+tests.add(task_return_value)
 
 ------------------------------------------------------
 

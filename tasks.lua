@@ -1,7 +1,17 @@
 local module = {}
 local event_t = {}
+local future_t = {}
 local task_t = {}
 local scheduler = {current = nil, waiting = {}}
+
+-- Param forwarding
+local function pack(...)
+	return {select("#", pack), ...}
+end
+
+local function unpack(t)
+	return table.unpack(t, 2, t[1] + 1)
+end
 
 -- Observer
 function event_t:new()
@@ -174,9 +184,54 @@ local function stop_listening(evt, callback)
 	scheduler.waiting[evt]:remove_listener(callback)
 end
 
+-- Future API
+function future_t:new(event)
+	local out = setmetatable({state = "pending", data = {}, event = event},
+	                         {__index = self})
+	scheduler.waiting[event]  = scheduler.waiting[event] or event_t:new()
+	scheduler.waiting[out] = event_t:new()
+
+	out.listener = function(_, ...)
+		out.data = pack(...)
+		out.state = "done"
+		emit(out, ...)
+	end
+	scheduler.waiting[event]:await(out.listener)
+	return out
+end
+
+function future_t:get()
+	if self.state == "done" then
+		return unpack(self.data)
+	elseif self.state == "cancelled" then
+		return
+	else
+		return await(self)
+	end
+end
+
+function future_t:is_done()
+	return self.state == "done"
+end
+
+function future_t:cancel()
+	if self.state ~= "pending" then
+		return
+	end
+	scheduler.waiting[self.event]:remove_listener(self.listener)
+	self.state = "cancelled"
+	emit(self)
+	scheduler.waiting[self] = nil
+end
+
+function future_t:is_cancelled()
+	return self.state == "cancelled"
+end
+
 -- Module API
 module.event_t = event_t
 module.task_t = task_t
+module.future_t = future_t
 module.await = await
 module.emit = emit
 module.par_or = par_or

@@ -688,6 +688,109 @@ function listen_once()
 end
 tests.add(listen_once)
 
+function future_get_blocks()
+	local a = 0
+	local fa = function()
+		local f = future_t:new(1)
+		a = 1
+		a = f:get()
+	end
+	local ta = task_t:new(fa)
+	ta()
+	assert(a == 1)
+	assert(ta.state == "alive")
+	emit(1, 2)
+	assert(a == 2)
+	assert(ta.state == "dead")
+end
+tests.add(future_get_blocks)
+
+function future_get_doesntblock()
+	local a = 0
+	local fb = function()
+		local f = future_t:new(1)
+		a = 1
+		emit(2)
+		a = f:get()
+	end
+	local tb = task_t:new(fb)
+
+	local fa = function()
+		await(2)
+		emit(1, 2)
+	end
+	local ta = task_t:new(fa)
+	ta()
+	tb()
+	assert(a == 2)
+	assert(ta.state == "dead")
+	assert(tb.state == "dead")
+end
+tests.add(future_get_doesntblock)
+
+function future_get_multiple_returns()
+	local a = 0
+	local fa = function()
+		local f = future_t:new(1)
+		a = 1
+		local function b(...)
+			a = {select("#", ...), ...}
+		end
+		b(f:get())
+	end
+	local ta = task_t:new(fa)
+	ta()
+	assert(a == 1)
+	assert(ta.state == "alive")
+	emit(1, 2, nil, 3, nil, 4, nil)
+
+	assert(a[1] == 6)
+	assert(a[2] == 2)
+	assert(a[3] == nil)
+	assert(a[4] == 3)
+	assert(a[5] == nil)
+	assert(a[6] == 4)
+	assert(a[7] == nil)
+	assert(ta.state == "dead")
+end
+tests.add(future_get_multiple_returns)
+
+function future_get_cancelled()
+	local a = 0
+	local b = 0
+	local f = future_t:new(1)
+	local function fa()
+		a = f:get()
+		b = 1
+	end
+	local ta = task_t:new(fa)
+	f:cancel()
+	ta()
+	assert(a == nil)
+	assert(b == 1)
+	assert(f:is_cancelled())
+end
+tests.add(future_get_cancelled)
+
+function future_get_cancelled_ignores_event()
+	local a = 0
+	local b = 0
+	local f = future_t:new(1)
+	local function fa()
+		a = f:get()
+		b = 1
+	end
+	local ta = task_t:new(fa)
+	f:cancel()
+	emit(1, 2)
+	ta()
+	emit(1, 2)
+	assert(a == nil)
+	assert(b == 1)
+	assert(f:is_cancelled())
+end
+tests.add(future_get_cancelled_ignores_event)
+
 ------------------------------------------------------
 
 -- Get function names

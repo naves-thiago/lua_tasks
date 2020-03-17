@@ -65,6 +65,7 @@ function task_t:__call(no_await, independent)
 		await(self)
 	end
 	if success and output then
+		self.ret_val = output
 		return unpack(output)
 	end
 	-- TODO handle errors
@@ -92,6 +93,10 @@ function task_t:disown()
     self.parent.done:remove_listener(self.suicide_cb)
     self.parent = nil
     self.suicide_cb = nil
+end
+
+function task_t:result()
+	return unpack(self.ret_val)
 end
 
 -- Scheduler API

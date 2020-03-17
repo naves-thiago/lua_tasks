@@ -815,6 +815,20 @@ function task_return_value()
 end
 tests.add(task_return_value)
 
+function task_result()
+	local ta = task_t:new(function() return 1, nil, 2, nil, 3, nil end)
+	ta()
+	local r = pack(ta:result())
+	assert(r[0] == 6)
+	assert(r[1] == 1)
+	assert(r[2] == nil)
+	assert(r[3] == 2)
+	assert(r[4] == nil)
+	assert(r[5] == 3)
+	assert(r[6] == nil)
+end
+tests.add(task_result)
+
 ------------------------------------------------------
 
 -- Get function names

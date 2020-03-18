@@ -829,6 +829,35 @@ function task_result()
 end
 tests.add(task_result)
 
+function par_or_return_value()
+	local function fa() await(1) return 1, nil, 2, nil, 3, nil end
+	local function fb() await(2) return 2, nil, 3, nil, 4, nil end
+	local pt = par_or(fa, fb)
+	pt(true)
+	emit(1)
+	local r = pack(pt:result())
+	assert(r[0] == 6, ""..r[0].." ~= 6")
+	assert(r[1] == 1)
+	assert(r[2] == nil)
+	assert(r[3] == 2)
+	assert(r[4] == nil)
+	assert(r[5] == 3)
+	assert(r[6] == nil)
+
+	pt = par_or(fa, fb)
+	pt(true)
+	emit(2)
+	r = pack(pt:result())
+	assert(r[0] == 6)
+	assert(r[1] == 2)
+	assert(r[2] == nil)
+	assert(r[3] == 3)
+	assert(r[4] == nil)
+	assert(r[5] == 4)
+	assert(r[6] == nil)
+end
+tests.add(par_or_return_value)
+
 ------------------------------------------------------
 
 -- Get function names

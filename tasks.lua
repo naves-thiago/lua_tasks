@@ -52,21 +52,20 @@ function task_t:__call(no_await, independent)
 	end
 	self.state = "alive"
 	self.parent = scheduler.current
-	self.coroutine = coroutine.create(function() local res = pack(self.f()) self:kill() return res end)
+	self.coroutine = coroutine.create(function() self.ret_val = pack(self.f()) self:kill() end)
 	scheduler.current = self
 	if self.parent and not independent then
 		self.suicide_cb = function() self:kill() end
 		self.parent.done:listen(self.suicide_cb)
 	end
 	local success, output = coroutine.resume(self.coroutine)
-	if self.parent and not no_await then
+	if success and self.parent and not no_await then
 		-- Started from another task
-		self.done:listen(function() emit(self) end)
+		self.done:listen(function(_, ...) emit(self, ...) end)
 		await(self)
 	end
-	if success and output then
-		self.ret_val = output
-		return unpack(output)
+	if success and self.ret_val then
+		return unpack(self.ret_val)
 	end
 	-- TODO handle errors
 end
@@ -76,7 +75,7 @@ function task_t:kill()
 		return
 	end
 	self.state = "dead"
-	self.done()
+	self.done(self)
 	if scheduler.current == self then
 		scheduler.current = self.parent
 	end
@@ -96,7 +95,9 @@ function task_t:disown()
 end
 
 function task_t:result()
-	return unpack(self.ret_val)
+	if self.ret_val then
+		return unpack(self.ret_val)
+	end
 end
 
 -- Scheduler API
@@ -136,12 +137,14 @@ local function par_or(...)
 		end
 	end
 	local uuid = tasks -- Reuse the taskts table as an unique event ID for this call
-	local done_cb = function() emit(uuid) end
+	local done_cb = function(_, task)
+		emit(uuid, task:result())
+	end
 	local task = task_t:new(function()
 			for _, t in ipairs(tasks) do
 				t(true)
 			end
-			await(uuid)
+			return await(uuid)
 		end)
 	for _, t in ipairs(tasks) do
 		t.done:listen(done_cb)

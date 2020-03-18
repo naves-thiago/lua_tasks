@@ -67,7 +67,10 @@ function task_t:__call(no_await, independent)
 	if success and self.ret_val then
 		return unpack(self.ret_val)
 	end
-	-- TODO handle errors
+	if not success then
+		print("Error in the task '" .. self.name .. "'")
+		print(debug.traceback(self.coroutine, output))
+	end
 end
 
 function task_t:kill()

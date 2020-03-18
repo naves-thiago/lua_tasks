@@ -40,6 +40,15 @@ function event_t:__call(...)
 end
 
 -- Task
+local function task_parent_trace(t)
+	local out = {"Task start stack:"}
+	repeat
+		table.insert(out,  "        " .. t.name)
+		t = t.parent
+	until t == nil
+	return table.concat(out, "\n")
+end
+
 function task_t:new(f, name)
 	local t = {f = f, done = event_t:new(), state = "ready", parent = nil, coroutine = nil, name = name or "??"}
 	return setmetatable(t, {__index = self, __call = self.__call})
@@ -70,6 +79,7 @@ function task_t:__call(no_await, independent)
 	if not success then
 		print("Error in the task '" .. self.name .. "'")
 		print(debug.traceback(self.coroutine, output))
+		print(task_parent_trace(self))
 	end
 end
 
@@ -152,6 +162,7 @@ local function par_or(...)
 	for _, t in ipairs(tasks) do
 		t.done:listen(done_cb)
 	end
+	task.name = "par_or"
 	return task
 end
 

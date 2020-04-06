@@ -3,6 +3,7 @@ local event_t = {}
 local future_t = {}
 local task_t = {}
 local scheduler = {current = nil, waiting = {}}
+local heap = require"BinaryMinHeap"
 
 -- Param forwarding
 local function pack(...)
@@ -114,17 +115,13 @@ function task_t:result()
 end
 
 -- Scheduler API
-local function await(evt)
-	local waiting = scheduler.waiting
-	if not scheduler.current then
-		return
-	end
-
-	if not waiting[evt] then
-		waiting[evt] = event_t:new()
-	end
+-- Interal function
+-- Blocks the caller thread until the evt event is emitted
+-- Param obj: event_t instance - the event to wait for
+-- Returns the parameters sent to emit() (minus the event id)
+local function _await_obj(evt)
 	local curr = scheduler.current
-	waiting[evt]:await(function(_, ...)
+	evt:await(function(_, ...)
 			if curr.state ~= "dead" then
 				scheduler.current = curr
 				coroutine.resume(curr.coroutine, ...)
@@ -133,6 +130,21 @@ local function await(evt)
 
 	scheduler.current = curr.parent
 	return coroutine.yield()
+end
+
+-- Blocks the caller thread until the evt event is emitted
+-- Param obj_id: Event identifier. Can be any valid table key.
+-- Returns the parameters sent to emit() (minus the event id)
+local function await(evt_id)
+	local waiting = scheduler.waiting
+	if not scheduler.current then
+		return
+	end
+
+	if not waiting[evt_id] then
+		waiting[evt_id] = event_t:new()
+	end
+	return _await_obj(waiting[evt_id])
 end
 
 local function emit(evt, ...)
@@ -254,6 +266,18 @@ function future_t:is_cancelled()
 	return self.state == "cancelled"
 end
 
+-- Timer API
+-- Returns current time in milliseconds
+local function now_ms()
+	--TODO
+end
+
+local function in_ms(ms, cb)
+	scheduler.waiting_time:enqueue(cb, now_ms() + ms)
+end
+
+--function await_ms
+
 -- Module API
 module.event_t = event_t
 module.task_t = task_t
@@ -266,5 +290,7 @@ module.listen = listen
 module.stop_listening = stop_listening
 module.pack = pack
 module.unpack = unpack
+module.now_ms = now_ms
+module.in_ms = in_ms
 
 return module

@@ -1,8 +1,9 @@
+local heap = require"BinaryMinHeap"
 local module = {}
 local event_t = {}
 local future_t = {}
 local task_t = {}
-local scheduler = {current = nil, waiting = {}}
+local scheduler = {current = nil, waiting = {}, timestamp = 0, waiting_time = heap:new()}
 
 -- Param forwarding
 local function pack(...)
@@ -114,17 +115,13 @@ function task_t:result()
 end
 
 -- Scheduler API
-local function await(evt)
-	local waiting = scheduler.waiting
-	if not scheduler.current then
-		return
-	end
-
-	if not waiting[evt] then
-		waiting[evt] = event_t:new()
-	end
+-- Interal function
+-- Blocks the caller thread until the evt event is emitted
+-- Param obj: event_t instance - the event to wait for
+-- Returns the parameters sent to emit() (minus the event id)
+local function _await_obj(evt)
 	local curr = scheduler.current
-	waiting[evt]:await(function(_, ...)
+	evt:await(function(_, ...)
 			if curr.state ~= "dead" then
 				scheduler.current = curr
 				coroutine.resume(curr.coroutine, ...)
@@ -133,6 +130,21 @@ local function await(evt)
 
 	scheduler.current = curr.parent
 	return coroutine.yield()
+end
+
+-- Blocks the caller thread until the evt event is emitted
+-- Param obj_id: Event identifier. Can be any valid table key.
+-- Returns the parameters sent to emit() (minus the event id)
+local function await(evt_id)
+	local waiting = scheduler.waiting
+	if not scheduler.current then
+		return
+	end
+
+	if not waiting[evt_id] then
+		waiting[evt_id] = event_t:new()
+	end
+	return _await_obj(waiting[evt_id])
 end
 
 local function emit(evt, ...)
@@ -254,6 +266,88 @@ function future_t:is_cancelled()
 	return self.state == "cancelled"
 end
 
+-- Timer API
+local timer_t = {}
+
+-- Instantiate a new timet_t object
+-- Param interval: Amount of time to wait before executing the callback
+-- Param callback: The callback function
+-- Param cyclic: If true, the timer will execute the callback each <interval> period.
+-- Otherwise, the callback will execute once and the timer will be stopped
+function timer_t:new(interval, callback, cyclic)
+	return setmetatable({interval = interval, callback = callback, cyclic = cyclic, active = false},
+		{__index = self})
+end
+
+-- Schedules the timer for execution. If the timer is already running, does nothing
+function timer_t:start()
+	if self.active then
+		return
+	end
+	self.active = true
+	scheduler.waiting_time:enqueue(self, scheduler.timestamp + self.interval)
+end
+
+-- Internal function. Reschedules / stops the timer and executes the callback
+function timer_t:_execute()
+	self.active = false
+	if self.cyclic then
+		self:start()
+	end
+	self.callback()
+end
+
+-- Stops the current timer. The timer callback won't be called.
+-- If the timer is already stopped, does nothing.
+function timer_t:stop()
+	if not self.active then
+		return
+	end
+	self.active = false
+	scheduler.waiting_time:remove(self)
+end
+
+-- Increments the current timestamp
+-- Param dt: Elapsed time since last call to this function (or the program starting) in milliseconds
+local function update_time(dt)
+	scheduler.timestamp = scheduler.timestamp + dt
+	local waiting_time = scheduler.waiting_time
+	while true do
+		local timer, timestamp = waiting_time:peek()
+		if timer and scheduler.timestamp >= timestamp then
+			waiting_time:dequeue()
+			timer:_execute()
+		else
+			break
+		end
+	end
+end
+
+-- Returns current time in milliseconds
+local function now_ms()
+	return scheduler.timestamp
+end
+
+-- Executes a callback in <ms> milliseconds from now
+-- Param ms: Period in milliseconds to wait before executing the callback
+-- Param cb: Callback function
+-- Return: timer_t instance - the timer controlling this operation
+local function in_ms(ms, cb)
+	local timer = timer_t:new(ms, cb, false)
+	timer:start()
+	return timer
+end
+
+-- Executes a callback every <ms> milliseconds. Starts counting now
+-- Param ms: Period of execution in milliseconds
+-- Param cb: Callback function
+-- Return: timer_t instance - the timer controlling this operation
+local function every_ms(ms, cb)
+	local timer = timer_t:new(ms, cb, true)
+	timer:start()
+	return timer
+end
+
 -- Module API
 module.event_t = event_t
 module.task_t = task_t
@@ -266,5 +360,12 @@ module.listen = listen
 module.stop_listening = stop_listening
 module.pack = pack
 module.unpack = unpack
+module.now_ms = now_ms
+module.in_ms = in_ms
+module.timer_t = timer_t
+module.update_time = update_time
+module.now_ms = now_ms
+module.in_ms = in_ms
+module.every_ms = every_ms
 
 return module

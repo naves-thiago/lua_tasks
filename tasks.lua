@@ -2,7 +2,7 @@ local module = {}
 local event_t = {}
 local future_t = {}
 local task_t = {}
-local scheduler = {current = nil, waiting = {}}
+local scheduler = {current = nil, waiting = {}, timestamp = 0}
 local heap = require"BinaryMinHeap"
 
 -- Param forwarding
@@ -267,13 +267,69 @@ function future_t:is_cancelled()
 end
 
 -- Timer API
+local timer_t = {}
+
+-- Instantiate a new timet_t object
+-- Param interval: Amount of time to wait before executing the callback
+-- Param callback: The callback function
+-- Param cyclic: If true, the timer will execute the callback each 'interval' period.
+-- Otherwise, the callback will execute once and the timer will be stopped
+function timer_t:new(interval, callback, cyclic)
+	return setmetatable({interval = interval, callback = callback, cyclic = cyclic}, {__index = self})
+end
+
+-- Schedules the timer for execution. If the timer is already running, does nothing
+function timer_t:start()
+	if self.active then
+		return
+	end
+	self.active = true
+	scheduler.waiting_time:enqueue(self, scheduler.timestamp + self.interval)
+end
+
+-- Internal function. Reschedules / stops the timer and executes the callback
+function timer_t:_execute()
+	self.active = false
+	if self.cyclic then
+		scheduler.waiting_time:enqueue(self, scheduler.timestamp + self.interval)
+	end
+	self.cb()
+end
+
+-- Stops the current timer. The timer callback won't be called.
+-- If the timer is already stopped, does nothing.
+function timer_t:stop()
+	if not self.active then
+		return
+	end
+	self.active = false
+	scheduler.waiting_time:remove(self)
+end
+
+-- Increments the current timestamp
+-- Param dt: Elapsed time since last call to this function (or the program starting) in milliseconds
+local function update_time(dt)
+	scheduler.timestamp = scheduler.timestamp + dt
+	local waiting_time = scheduler.waiting_time
+	while true do
+		local timer, timestamp = waiting_time:peek()
+		if timestamp >= scheduler.timestamp then
+			waiting_time:dequeue()
+			timer:_execute()
+		else
+			break
+		end
+	end
+end
+
 -- Returns current time in milliseconds
 local function now_ms()
-	--TODO
+	return scheduler.timestamp
 end
 
 local function in_ms(ms, cb)
-	scheduler.waiting_time:enqueue(cb, now_ms() + ms)
+	local timer = timer_t:new(ms, cb, false)
+	timer:start()
 end
 
 --function await_ms

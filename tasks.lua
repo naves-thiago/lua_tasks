@@ -1,9 +1,9 @@
+local heap = require"BinaryMinHeap"
 local module = {}
 local event_t = {}
 local future_t = {}
 local task_t = {}
-local scheduler = {current = nil, waiting = {}, timestamp = 0}
-local heap = require"BinaryMinHeap"
+local scheduler = {current = nil, waiting = {}, timestamp = 0, waiting_time = heap:new()}
 
 -- Param forwarding
 local function pack(...)
@@ -275,7 +275,8 @@ local timer_t = {}
 -- Param cyclic: If true, the timer will execute the callback each 'interval' period.
 -- Otherwise, the callback will execute once and the timer will be stopped
 function timer_t:new(interval, callback, cyclic)
-	return setmetatable({interval = interval, callback = callback, cyclic = cyclic}, {__index = self})
+	return setmetatable({interval = interval, callback = callback, cyclic = cyclic, active = false},
+		{__index = self})
 end
 
 -- Schedules the timer for execution. If the timer is already running, does nothing
@@ -291,9 +292,9 @@ end
 function timer_t:_execute()
 	self.active = false
 	if self.cyclic then
-		scheduler.waiting_time:enqueue(self, scheduler.timestamp + self.interval)
+		self:start()
 	end
-	self.cb()
+	self.callback()
 end
 
 -- Stops the current timer. The timer callback won't be called.
@@ -313,7 +314,7 @@ local function update_time(dt)
 	local waiting_time = scheduler.waiting_time
 	while true do
 		local timer, timestamp = waiting_time:peek()
-		if timestamp >= scheduler.timestamp then
+		if timer and scheduler.timestamp >= timestamp then
 			waiting_time:dequeue()
 			timer:_execute()
 		else
@@ -330,6 +331,13 @@ end
 local function in_ms(ms, cb)
 	local timer = timer_t:new(ms, cb, false)
 	timer:start()
+	return timer
+end
+
+local function every_ms(ms, cb)
+	local timer = timer_t:new(ms, cb, true)
+	timer:start()
+	return timer
 end
 
 --function await_ms
@@ -348,5 +356,10 @@ module.pack = pack
 module.unpack = unpack
 module.now_ms = now_ms
 module.in_ms = in_ms
+module.timer_t = timer_t
+module.update_time = update_time
+module.now_ms = now_ms
+module.in_ms = in_ms
+module.every_ms = every_ms
 
 return module

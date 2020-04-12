@@ -1057,6 +1057,42 @@ function timer_stop_cyclic()
 end
 tests.add(timer_stop_cyclic)
 
+function timer_in_ms()
+	local exec = false
+	local t = in_ms(2, function() exec = true end)
+
+	update_time(1)
+	assert(t.active == true)
+	assert(exec == false)
+
+	update_time(1)
+	assert(exec == true)
+	assert(t.active == false)
+
+	exec = false
+	update_time(1)
+	assert(exec == false)
+	assert(t.active == false)
+end
+tests.add(timer_in_ms)
+
+function timer_every_ms()
+	local exec = false
+	local t = every_ms(2, function() exec = true end)
+
+	for i = 1, 2 do
+		exec = false
+		update_time(1)
+		assert(t.active == true)
+		assert(exec == false)
+
+		update_time(1)
+		assert(exec == true)
+		assert(t.active == true)
+	end
+end
+tests.add(timer_every_ms)
+
 ------------------------------------------------------
 
 -- Get function names

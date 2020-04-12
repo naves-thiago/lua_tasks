@@ -285,7 +285,12 @@ function timer_t:start()
 		return
 	end
 	self.active = true
-	scheduler.waiting_time:enqueue(self, scheduler.timestamp + self.interval)
+	if not self.timestamp then
+		self.timestamp = scheduler.timestamp + self.interval
+	else
+		self.timestamp = self.timestamp + self.interval
+	end
+	scheduler.waiting_time:enqueue(self, self.timestamp)
 end
 
 -- Internal function. Reschedules / stops the timer and executes the callback

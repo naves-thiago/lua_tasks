@@ -991,7 +991,7 @@ function timer_execute_late_cyclic()
 	assert(t.active == true)
 
 	exec = false
-	update_time(2)
+	update_time(1)
 	assert(exec == true)
 	assert(t.active == true)
 end

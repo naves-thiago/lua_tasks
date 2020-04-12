@@ -876,6 +876,187 @@ function par_or_return_value()
 end
 tests.add(par_or_return_value)
 
+function timer_execute_once()
+	local exec = false
+	local t = timer_t:new(1, function() exec = true end, false)
+	assert(t.active == false)
+	t:start()
+	assert(t.active == true)
+	assert(exec == false)
+	update_time(1)
+	assert(exec == true)
+	assert(t.active == false)
+
+	exec = false
+	update_time(1)
+	assert(exec == false)
+	assert(t.active == false)
+end
+tests.add(timer_execute_once)
+
+function timer_execute_cyclic()
+	local exec = false
+	local t = timer_t:new(1, function() exec = true end, true)
+	assert(t.active == false)
+	t:start()
+	assert(t.active == true)
+	assert(exec == false)
+
+	update_time(1)
+	assert(exec == true)
+	assert(t.active == true)
+
+	exec = false
+	update_time(1)
+	assert(exec == true)
+	assert(t.active == true)
+end
+tests.add(timer_execute_cyclic)
+
+function timer_execute_once_2()
+	local exec = false
+	local t = timer_t:new(2, function() exec = true end, false)
+	assert(t.active == false)
+	t:start()
+	assert(t.active == true)
+	assert(exec == false)
+
+	update_time(1)
+	assert(t.active == true)
+	assert(exec == false)
+
+	update_time(1)
+	assert(exec == true)
+	assert(t.active == false)
+
+	exec = false
+	update_time(1)
+	assert(exec == false)
+	assert(t.active == false)
+end
+tests.add(timer_execute_once_2)
+
+function timer_execute_cyclic_2()
+	local exec = false
+	local t = timer_t:new(2, function() exec = true end, true)
+	assert(t.active == false)
+	t:start()
+	assert(t.active == true)
+	assert(exec == false)
+
+	for i = 1, 2 do
+		exec = false
+		update_time(1)
+		assert(t.active == true)
+		assert(exec == false)
+		
+		update_time(1)
+		assert(exec == true)
+		assert(t.active == true)
+	end
+end
+tests.add(timer_execute_cyclic_2)
+
+function timer_execute_late_once()
+	local exec = false
+	local t = timer_t:new(2, function() exec = true end, false)
+	assert(t.active == false)
+
+	t:start()
+	assert(t.active == true)
+	assert(exec == false)
+
+	update_time(3)
+	assert(exec == true)
+	assert(t.active == false)
+
+	exec = false
+	update_time(3)
+	assert(exec == false)
+	assert(t.active == false)
+end
+tests.add(timer_execute_late_once)
+
+function timer_execute_late_cyclic()
+	local exec = false
+	local t = timer_t:new(2, function() exec = true end, true)
+	assert(t.active == false)
+
+	t:start()
+	assert(t.active == true)
+	assert(exec == false)
+
+	update_time(3)
+	assert(exec == true)
+	assert(t.active == true)
+
+	exec = false
+	update_time(2)
+	assert(exec == true)
+	assert(t.active == true)
+end
+tests.add(timer_execute_late_cyclic)
+
+function timer_stop_once()
+	local exec = false
+	local t = timer_t:new(2, function() exec = true end, false)
+	assert(t.active == false)
+	t:start()
+	assert(t.active == true)
+	assert(exec == false)
+
+	t:stop()
+	assert(t.active == false)
+	assert(exec == false)
+
+	update_time(1)
+	assert(t.active == false)
+	assert(exec == false)
+end
+tests.add(timer_stop_once)
+
+function timer_stop_cyclic()
+	local exec = false
+	-- Stop before first execution
+	local t = timer_t:new(2, function() exec = true end, true)
+	assert(t.active == false)
+	t:start()
+	assert(t.active == true)
+	assert(exec == false)
+	t:stop()
+	assert(t.active == false)
+	assert(exec == false)
+
+	update_time(1)
+	assert(t.active == false)
+	assert(exec == false)
+	
+	update_time(1)
+	assert(t.active == false)
+	assert(exec == false)
+
+	-- Stop after the first execution
+	t = timer_t:new(2, function() exec = true end, true)
+	assert(t.active == false)
+	t:start()
+	assert(t.active == true)
+	assert(exec == false)
+
+	update_time(2)
+	assert(t.active == true)
+	assert(exec == true)
+
+	exec = false
+	t:stop()
+	assert(t.active == false)
+	assert(exec == false)
+
+	update_time(2)
+	assert(t.active == false)
+	assert(exec == false)
+end
+tests.add(timer_stop_cyclic)
+
 ------------------------------------------------------
 
 -- Get function names

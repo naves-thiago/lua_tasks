@@ -752,6 +752,24 @@ function future_get_multiple_returns()
 end
 tests.add(future_get_multiple_returns)
 
+function future_done()
+	local is_done = 0
+	local function fa()
+		local f = future_t:new(1)
+		is_done = f:is_done()
+		await(1)
+		is_done = f:is_done()
+	end
+	local ta = task_t:new(fa)
+	ta()
+	assert(ta.state == "alive")
+	assert(is_done == false)
+	emit(1)
+	assert(is_done == true)
+	assert(ta.state == "dead")
+end
+tests.add(future_done)
+
 function future_get_cancelled()
 	local a = 0
 	local b = 0

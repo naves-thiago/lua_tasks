@@ -116,7 +116,7 @@ end
 
 -- Scheduler API
 -- Interal function
--- Blocks the caller thread until the evt event is emitted
+-- Blocks the caller task until the <evt> event is emitted
 -- Param obj: event_t instance - the event to wait for
 -- Returns the parameters sent to emit() (minus the event id)
 local function _await_obj(evt)
@@ -132,7 +132,7 @@ local function _await_obj(evt)
 	return coroutine.yield()
 end
 
--- Blocks the caller thread until the evt event is emitted
+-- Blocks the caller task until the <evt> event is emitted
 -- Param obj_id: Event identifier. Can be any valid table key.
 -- Returns the parameters sent to emit() (minus the event id)
 local function await(evt_id)
@@ -161,7 +161,7 @@ local function par_or(...)
 			tasks[i] = task_t:new(v)
 		end
 	end
-	local uuid = tasks -- Reuse the taskts table as an unique event ID for this call
+	local uuid = tasks -- Reuse the tasks table as an unique event ID for this call
 	local done_cb = function(_, task)
 		emit(uuid, task:result())
 	end
@@ -185,7 +185,7 @@ local function par_and(...)
 			tasks[i] = task_t:new(v)
 		end
 	end
-	local uuid = tasks -- Reuse the taskts table as an unique event ID for this call
+	local uuid = tasks -- Reuse the tasks table as an unique event ID for this call
 	local pending = #tasks
 	local done_cb = function()
 			pending = pending - 1
@@ -226,7 +226,7 @@ end
 function future_t:new(event)
 	local out = setmetatable({state = "pending", data = {}, event = event},
 	                         {__index = self})
-	scheduler.waiting[event]  = scheduler.waiting[event] or event_t:new()
+	scheduler.waiting[event] = scheduler.waiting[event] or event_t:new()
 	scheduler.waiting[out] = event_t:new()
 
 	out.listener = function(_, ...)
@@ -269,7 +269,7 @@ end
 -- Timer API
 local timer_t = {}
 
--- Instantiate a new timet_t object
+-- Instantiates a new timet_t object
 -- Param interval: Amount of time to wait before executing the callback
 -- Param callback: The callback function
 -- Param cyclic: If true, the timer will execute the callback each <interval> period.
@@ -348,6 +348,14 @@ local function every_ms(ms, cb)
 	return timer
 end
 
+-- Blocks the caller task for <ms> milliseconds
+-- Param ms: Amount of time to block the task for
+local function await_ms(ms)
+	local evt = event_t:new()
+	in_ms(ms, evt)
+	_await_obj(evt)
+end
+
 -- Module API
 module.event_t = event_t
 module.task_t = task_t
@@ -367,5 +375,6 @@ module.update_time = update_time
 module.now_ms = now_ms
 module.in_ms = in_ms
 module.every_ms = every_ms
+module.await_ms = await_ms
 
 return module

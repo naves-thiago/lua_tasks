@@ -1093,6 +1093,33 @@ function timer_every_ms()
 end
 tests.add(timer_every_ms)
 
+function await_ms_blocks_task()
+	local out = 0
+	local fa = function() await_ms(1) out = 1 end
+	local ta = task_t:new(fa)
+	ta()
+	assert(out == 0)
+	update_time(1)
+	assert(out == 1)
+end
+tests.add(await_ms_blocks_task)
+
+function await_ms_unblock_multiple_tasks_at_once()
+	local a, b = 0, 0
+	local fa = function() await_ms(1) a = 1 end
+	local fb = function() await_ms(1) b = 1 end
+	local ta = task_t:new(fa)
+	local tb = task_t:new(fb)
+	ta()
+	tb()
+	assert(a == 0)
+	assert(b == 0)
+	update_time(1)
+	assert(a == 1)
+	assert(b == 1)
+end
+tests.add(await_ms_unblock_multiple_tasks_at_once)
+
 ------------------------------------------------------
 
 -- Get function names

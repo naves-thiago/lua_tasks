@@ -876,7 +876,7 @@ function par_or_return_value()
 end
 tests.add(par_or_return_value)
 
-function timer_execute_once()
+function trigger_once_timer_executes_only_once()
 	local exec = false
 	local t = timer_t:new(1, function() exec = true end, false)
 	assert(t.active == false)
@@ -892,9 +892,9 @@ function timer_execute_once()
 	assert(exec == false)
 	assert(t.active == false)
 end
-tests.add(timer_execute_once)
+tests.add(trigger_once_timer_executes_only_once)
 
-function timer_execute_cyclic()
+function cyclic_timer_executes_twice()
 	local exec = false
 	local t = timer_t:new(1, function() exec = true end, true)
 	assert(t.active == false)
@@ -911,9 +911,9 @@ function timer_execute_cyclic()
 	assert(exec == true)
 	assert(t.active == true)
 end
-tests.add(timer_execute_cyclic)
+tests.add(cyclic_timer_executes_twice)
 
-function timer_execute_once_2()
+function trigger_once_timer_executes_after_2_updates()
 	local exec = false
 	local t = timer_t:new(2, function() exec = true end, false)
 	assert(t.active == false)
@@ -934,9 +934,9 @@ function timer_execute_once_2()
 	assert(exec == false)
 	assert(t.active == false)
 end
-tests.add(timer_execute_once_2)
+tests.add(trigger_once_timer_executes_after_2_updates)
 
-function timer_execute_cyclic_2()
+function cyclic_timer_executes_after_2_updates()
 	local exec = false
 	local t = timer_t:new(2, function() exec = true end, true)
 	assert(t.active == false)
@@ -955,9 +955,9 @@ function timer_execute_cyclic_2()
 		assert(t.active == true)
 	end
 end
-tests.add(timer_execute_cyclic_2)
+tests.add(cyclic_timer_executes_after_2_updates)
 
-function timer_execute_late_once()
+function trigger_once_timer_executes_when_late()
 	local exec = false
 	local t = timer_t:new(2, function() exec = true end, false)
 	assert(t.active == false)
@@ -975,9 +975,9 @@ function timer_execute_late_once()
 	assert(exec == false)
 	assert(t.active == false)
 end
-tests.add(timer_execute_late_once)
+tests.add(trigger_once_timer_executes_when_late)
 
-function timer_execute_late_cyclic()
+function cyclic_timer_executes_when_late()
 	local exec = false
 	local t = timer_t:new(2, function() exec = true end, true)
 	assert(t.active == false)
@@ -995,9 +995,9 @@ function timer_execute_late_cyclic()
 	assert(exec == true)
 	assert(t.active == true)
 end
-tests.add(timer_execute_late_cyclic)
+tests.add(cyclic_timer_executes_when_late)
 
-function timer_stop_once()
+function stop_trigger_once_timer()
 	local exec = false
 	local t = timer_t:new(2, function() exec = true end, false)
 	assert(t.active == false)
@@ -1013,9 +1013,9 @@ function timer_stop_once()
 	assert(t.active == false)
 	assert(exec == false)
 end
-tests.add(timer_stop_once)
+tests.add(stop_trigger_once_timer)
 
-function timer_stop_cyclic()
+function stop_cyclic_timer()
 	local exec = false
 	-- Stop before first execution
 	local t = timer_t:new(2, function() exec = true end, true)
@@ -1055,9 +1055,9 @@ function timer_stop_cyclic()
 	assert(t.active == false)
 	assert(exec == false)
 end
-tests.add(timer_stop_cyclic)
+tests.add(stop_cyclic_timer)
 
-function timer_in_ms()
+function in_ms_triggers_only_once()
 	local exec = false
 	local t = in_ms(2, function() exec = true end)
 
@@ -1074,9 +1074,9 @@ function timer_in_ms()
 	assert(exec == false)
 	assert(t.active == false)
 end
-tests.add(timer_in_ms)
+tests.add(in_ms_triggers_only_once)
 
-function timer_every_ms()
+function every_ms_triggers_periodically()
 	local exec = false
 	local t = every_ms(2, function() exec = true end)
 
@@ -1091,7 +1091,7 @@ function timer_every_ms()
 		assert(t.active == true)
 	end
 end
-tests.add(timer_every_ms)
+tests.add(every_ms_triggers_periodically)
 
 function await_ms_blocks_task()
 	local out = 0

@@ -1,8 +1,9 @@
 local heap = require"BinaryMinHeap"
 local module = {}
 local event_t = {}
-local future_t = {}
 local task_t = {}
+local future_t = {}
+local timer_t = {}
 local scheduler = {current = nil, waiting = {}, timestamp = 0, waiting_time = heap:new()}
 
 -- Param forwarding
@@ -115,7 +116,7 @@ function task_t:result()
 end
 
 -- Scheduler API
--- Interal function
+-- Internal function
 -- Blocks the caller task until the <evt> event is emitted
 -- Param obj: event_t instance - the event to wait for
 -- Returns the parameters sent to emit() (minus the event id)
@@ -133,7 +134,7 @@ local function _await_obj(evt)
 end
 
 -- Blocks the caller task until the <evt> event is emitted
--- Param obj_id: Event identifier. Can be any valid table key.
+-- Param evt_id: Event identifier. Can be any valid table key.
 -- Returns the parameters sent to emit() (minus the event id)
 local function await(evt_id)
 	local waiting = scheduler.waiting
@@ -147,8 +148,8 @@ local function await(evt_id)
 	return _await_obj(waiting[evt_id])
 end
 
-local function emit(evt, ...)
-	local e = scheduler.waiting[evt]
+local function emit(evt_id, ...)
+	local e = scheduler.waiting[evt_id]
 	if e then
 		e(...)
 	end
@@ -205,9 +206,14 @@ local function par_and(...)
 		end)
 end
 
-local function listen(evt, callback, once)
-	local event = scheduler.waiting[evt] or event_t:new()
-	scheduler.waiting[evt] = event
+-- Registers a callback to be called when the an event occurs
+-- If <callback> is already a listener of the event, updates the <once> mode
+-- Param evt_id: Event identifier
+-- Param callback: The callback function
+-- Param once: If true, the callback will be called only on the next time the event occurs (instead of everytime)
+local function listen(evt_id, callback, once)
+	local event = scheduler.waiting[evt_id] or event_t:new()
+	scheduler.waiting[evt_id] = event
 	if once then
 		event:await(callback)
 	else
@@ -215,18 +221,26 @@ local function listen(evt, callback, once)
 	end
 end
 
-local function stop_listening(evt, callback)
-	if not scheduler.waiting[evt] then
+-- Removes a callback from the event listeners
+-- If <callback> is not in the event's listeners, does nothing
+-- Param evt_id: Event identifier
+-- Param callback: The callback function
+local function stop_listening(evt_id, callback)
+	if not scheduler.waiting[evt_id] then
 		return
 	end
-	scheduler.waiting[evt]:remove_listener(callback)
+	scheduler.waiting[evt_id]:remove_listener(callback)
 end
 
 -- Future API
-function future_t:new(event)
-	local out = setmetatable({state = "pending", data = {}, event = event},
+
+-- Instantiates a new future_t object
+-- This class allows waiting for events asynchronously or block until it's emitted
+-- Param evt_id: Event identifier
+function future_t:new(evt_id)
+	local out = setmetatable({state = "pending", data = {}, evt_id = evt_id},
 	                         {__index = self})
-	scheduler.waiting[event] = scheduler.waiting[event] or event_t:new()
+	scheduler.waiting[evt_id] = scheduler.waiting[evt_id] or evt_id_t:new()
 	scheduler.waiting[out] = event_t:new()
 
 	out.listener = function(_, ...)
@@ -234,10 +248,14 @@ function future_t:new(event)
 		out.state = "done"
 		emit(out, ...)
 	end
-	scheduler.waiting[event]:await(out.listener)
+	scheduler.waiting[evt_id]:await(out.listener)
 	return out
 end
 
+-- Gets the value from the event. Blocks the caller task if not emitted yet
+-- If the future is done, this function is guaranteed to not block
+-- See also: future_t:is_done()
+-- Return: Event data if the future is done or nothing if cancelled
 function future_t:get()
 	if self.state == "done" then
 		return unpack(self.data)
@@ -248,26 +266,28 @@ function future_t:get()
 	end
 end
 
+-- Test if the future is done (i.e. the event was emitted)
 function future_t:is_done()
 	return self.state == "done"
 end
 
+-- Cancels the future and stop waiting for the corresponding event
 function future_t:cancel()
 	if self.state ~= "pending" then
 		return
 	end
-	scheduler.waiting[self.event]:remove_listener(self.listener)
+	scheduler.waiting[self.evt_id]:remove_listener(self.listener)
 	self.state = "cancelled"
 	emit(self)
 	scheduler.waiting[self] = nil
 end
 
+-- Checks if the future is cancelled
 function future_t:is_cancelled()
 	return self.state == "cancelled"
 end
 
 -- Timer API
-local timer_t = {}
 
 -- Instantiates a new timet_t object
 -- Param interval: Amount of time to wait before executing the callback
@@ -288,7 +308,8 @@ function timer_t:start()
 	scheduler.waiting_time:enqueue(self, scheduler.timestamp + self.interval)
 end
 
--- Internal function. Reschedules / stops the timer and executes the callback
+-- Internal function
+-- Reschedules / stops the timer and executes the callback
 function timer_t:_execute()
 	self.active = false
 	if self.cyclic then
@@ -323,7 +344,7 @@ local function update_time(dt)
 	end
 end
 
--- Returns current time in milliseconds
+-- Get current time in milliseconds
 local function now_ms()
 	return scheduler.timestamp
 end

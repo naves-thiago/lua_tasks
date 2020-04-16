@@ -240,7 +240,7 @@ end
 function future_t:new(evt_id)
 	local out = setmetatable({state = "pending", data = {}, evt_id = evt_id},
 	                         {__index = self})
-	scheduler.waiting[evt_id] = scheduler.waiting[evt_id] or evt_id_t:new()
+	scheduler.waiting[evt_id] = scheduler.waiting[evt_id] or event_t:new()
 	scheduler.waiting[out] = event_t:new()
 
 	out.listener = function(_, ...)

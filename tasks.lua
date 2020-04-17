@@ -15,23 +15,50 @@ local function unpack(t)
 	return table.unpack(t, 1, t[0])
 end
 
--- Observer
+-- Observer / Event API
+
+-- Instantiates a new event_t object.
+-- This class provides an observable object able to call multiple listeners and copy data to each one.
 function event_t:new()
-	return setmetatable({listeners = {}, waiting = {}}, {__index = self, __call = self.__call})
+	return setmetatable({listeners = {}, rep_listeners = 0}, {__index = self, __call = self.__call})
 end
 
+-- Adds a new listener to this event. This listener will be executed every time this event is triggered.
+-- If the callback is already a listener on this event, change it to be executed every time.
+-- Param f: Callback function. May receive any number of parameters (those will be forwarded from __call()).
 function event_t:listen(f)
-	self.listeners[f] = "repeat"
+	if self.listeners[f] ~= "repeat" then
+		self.rep_listeners = self.rep_listeners + 1
+		self.listeners[f] = "repeat"
+	end
 end
 
+-- Adds a new listener to this event. This listener will be executed only on the next time this event is triggered.
+-- If the callback is already a listener on this event, change it to be executed once.
+-- Param f: Callback function. May receive any number of parameters (those will be forwarded from __call()).
 function event_t:await(f)
+	if self.listeners[f] == "repeat" then
+		self.rep_listeners = self.rep_listeners - 1
+	end
 	self.listeners[f] = "once"
 end
 
+-- Removes a callback function from this event.
+-- Param f: Callback function. Ignored if not a listener.
 function event_t:remove_listener(f)
+	if self.listeners[f] == "repeat" then
+		self.rep_listeners = self.rep_listeners - 1
+	end
 	self.listeners[f] = nil
 end
 
+-- Returns the number of listeners set to execute every time this event is triggered (i.e. added via listen()).
+function event_t:repeat_listeners()
+	return self.rep_listeners
+end
+
+-- Triggers this event: Executes all the listeners and forward all parameters to each listener.
+-- The order of execution of the listeners is not defined.
 function event_t:__call(...)
 	for l, mode in pairs(self.listeners) do
 		l(self, ...)
@@ -116,10 +143,11 @@ function task_t:result()
 end
 
 -- Scheduler API
--- Internal function
--- Blocks the caller task until the <evt> event is emitted
--- Param obj: event_t instance - the event to wait for
--- Returns the parameters sent to emit() (minus the event id)
+
+-- Internal function.
+-- Blocks the caller task until the <evt> event is emitted.
+-- Param obj: event_t instance - the event to wait for.
+-- Returns the parameters sent to emit() (minus the event id).
 local function _await_obj(evt)
 	local curr = scheduler.current
 	evt:await(function(_, ...)
@@ -133,9 +161,9 @@ local function _await_obj(evt)
 	return coroutine.yield()
 end
 
--- Blocks the caller task until the <evt> event is emitted
+-- Blocks the caller task until the <evt> event is emitted.
 -- Param evt_id: Event identifier. Can be any valid table key.
--- Returns the parameters sent to emit() (minus the event id)
+-- Returns the parameters sent to emit() (minus the event id).
 local function await(evt_id)
 	local waiting = scheduler.waiting
 	if not scheduler.current then
@@ -152,6 +180,9 @@ local function emit(evt_id, ...)
 	local e = scheduler.waiting[evt_id]
 	if e then
 		e(...)
+		if e:repeat_listeners() == 0 then
+			scheduler.waiting[evt_id] = nil
+		end
 	end
 end
 
@@ -206,11 +237,11 @@ local function par_and(...)
 		end)
 end
 
--- Registers a callback to be called when the an event occurs
--- If <callback> is already a listener of the event, updates the <once> mode
--- Param evt_id: Event identifier
--- Param callback: The callback function
--- Param once: If true, the callback will be called only on the next time the event occurs (instead of everytime)
+-- Registers a callback to be called when the an event occurs.
+-- If <callback> is already a listener of the event, updates the <once> mode.
+-- Param evt_id: Event identifier.
+-- Param callback: The callback function.
+-- Param once: If true, the callback will be called only on the next time the event occurs (instead of everytime).
 local function listen(evt_id, callback, once)
 	local event = scheduler.waiting[evt_id] or event_t:new()
 	scheduler.waiting[evt_id] = event
@@ -221,10 +252,10 @@ local function listen(evt_id, callback, once)
 	end
 end
 
--- Removes a callback from the event listeners
--- If <callback> is not in the event's listeners, does nothing
--- Param evt_id: Event identifier
--- Param callback: The callback function
+-- Removes a callback from the event listeners.
+-- If <callback> is not in the event's listeners, does nothing.
+-- Param evt_id: Event identifier.
+-- Param callback: The callback function.
 local function stop_listening(evt_id, callback)
 	if not scheduler.waiting[evt_id] then
 		return
@@ -234,9 +265,9 @@ end
 
 -- Future API
 
--- Instantiates a new future_t object
--- This class allows waiting for events asynchronously or block until it's emitted
--- Param evt_id: Event identifier
+-- Instantiates a new future_t object.
+-- This class allows waiting for events asynchronously or block until it's emitted.
+-- Param evt_id: Event identifier.
 function future_t:new(evt_id)
 	local out = setmetatable({state = "pending", data = {}, evt_id = evt_id},
 	                         {__index = self})
@@ -252,10 +283,10 @@ function future_t:new(evt_id)
 	return out
 end
 
--- Gets the value from the event. Blocks the caller task if not emitted yet
--- If the future is done, this function is guaranteed to not block
--- See also: future_t:is_done()
--- Return: Event data if the future is done or nothing if cancelled
+-- Gets the value from the event. Blocks the caller task if not emitted yet.
+-- If the future is done, this function is guaranteed to not block.
+-- See also: future_t:is_done().
+-- Return: Event data if the future is done or nothing if cancelled.
 function future_t:get()
 	if self.state == "done" then
 		return unpack(self.data)
@@ -266,12 +297,12 @@ function future_t:get()
 	end
 end
 
--- Test if the future is done (i.e. the event was emitted)
+-- Test if the future is done (i.e. the event was emitted).
 function future_t:is_done()
 	return self.state == "done"
 end
 
--- Cancels the future and stop waiting for the corresponding event
+-- Cancels the future and stop waiting for the corresponding event.
 function future_t:cancel()
 	if self.state ~= "pending" then
 		return
@@ -282,24 +313,24 @@ function future_t:cancel()
 	scheduler.waiting[self] = nil
 end
 
--- Checks if the future is cancelled
+-- Checks if the future is cancelled.
 function future_t:is_cancelled()
 	return self.state == "cancelled"
 end
 
 -- Timer API
 
--- Instantiates a new timet_t object
--- Param interval: Amount of time to wait before executing the callback
--- Param callback: The callback function
+-- Instantiates a new timet_t object.
+-- Param interval: Amount of time to wait before executing the callback.
+-- Param callback: The callback function.
 -- Param cyclic: If true, the timer will execute the callback each <interval> period.
--- Otherwise, the callback will execute once and the timer will be stopped
+-- Otherwise, the callback will execute once and the timer will be stopped.
 function timer_t:new(interval, callback, cyclic)
 	return setmetatable({interval = interval, callback = callback, cyclic = cyclic, active = false},
 		{__index = self})
 end
 
--- Schedules the timer for execution. If the timer is already running, does nothing
+-- Schedules the timer for execution. If the timer is already running, does nothing.
 function timer_t:start()
 	if self.active then
 		return
@@ -308,8 +339,8 @@ function timer_t:start()
 	scheduler.waiting_time:enqueue(self, scheduler.timestamp + self.interval)
 end
 
--- Internal function
--- Reschedules / stops the timer and executes the callback
+-- Internal function.
+-- Reschedules / stops the timer and executes the callback.
 function timer_t:_execute()
 	self.active = false
 	if self.cyclic then
@@ -328,8 +359,8 @@ function timer_t:stop()
 	scheduler.waiting_time:remove(self)
 end
 
--- Increments the current timestamp
--- Param dt: Elapsed time since last call to this function (or the program starting) in milliseconds
+-- Increments the current timestamp.
+-- Param dt: Elapsed time since last call to this function (or the program starting) in milliseconds.
 local function update_time(dt)
 	scheduler.timestamp = scheduler.timestamp + dt
 	local waiting_time = scheduler.waiting_time
@@ -344,33 +375,33 @@ local function update_time(dt)
 	end
 end
 
--- Get current time in milliseconds
+-- Get current time in milliseconds.
 local function now_ms()
 	return scheduler.timestamp
 end
 
--- Executes a callback in <ms> milliseconds from now
--- Param ms: Period in milliseconds to wait before executing the callback
--- Param cb: Callback function
--- Return: timer_t instance - the timer controlling this operation
+-- Executes a callback in <ms> milliseconds from now.
+-- Param ms: Period in milliseconds to wait before executing the callback.
+-- Param cb: Callback function.
+-- Return: timer_t instance - the timer controlling this operation.
 local function in_ms(ms, cb)
 	local timer = timer_t:new(ms, cb, false)
 	timer:start()
 	return timer
 end
 
--- Executes a callback every <ms> milliseconds. Starts counting now
--- Param ms: Period of execution in milliseconds
--- Param cb: Callback function
--- Return: timer_t instance - the timer controlling this operation
+-- Executes a callback every <ms> milliseconds. Starts counting now.
+-- Param ms: Period of execution in milliseconds.
+-- Param cb: Callback function.
+-- Return: timer_t instance - the timer controlling this operation.
 local function every_ms(ms, cb)
 	local timer = timer_t:new(ms, cb, true)
 	timer:start()
 	return timer
 end
 
--- Blocks the caller task for <ms> milliseconds
--- Param ms: Amount of time to block the task for
+-- Blocks the caller task for <ms> milliseconds.
+-- Param ms: Amount of time to block the task for.
 local function await_ms(ms)
 	local evt = event_t:new()
 	in_ms(ms, evt)

@@ -7,6 +7,87 @@ function tests.add(f)
 	table.insert(tests, f)
 end
 
+function event_await()
+	local flag = false
+	local e = event_t:new()
+	e:await(function() flag = true end)
+	assert(flag == false)
+	e()
+	assert(flag == true)
+
+	flag = false
+	e()
+	assert(flag == false)
+end
+tests.add(event_await)
+
+function event_listen()
+	local flag = false
+	local e = event_t:new()
+	e:listen(function() flag = true end)
+	assert(flag == false)
+	e()
+	assert(flag == true)
+
+	flag = false
+	e()
+	assert(flag == true)
+end
+tests.add(event_listen)
+
+function event_remove_listener()
+	local flag = false
+	local f = function() flag = true end
+	local e = event_t:new()
+
+	-- Remove before first call
+	e:listen(f)
+	e:remove_listener(f)
+	e()
+	assert(flag == false)
+
+	e:await(f)
+	e:remove_listener(f)
+	e()
+	assert(flag == false)
+
+	-- Remove after first call
+	e:listen(f)
+	e()
+	assert(flag == true)
+	flag = false
+	e:remove_listener(f)
+	e()
+	assert(flag == false)
+
+	e:await(f)
+	e()
+	assert(flag == true)
+	flag = false
+	e:remove_listener(f)
+	e()
+	assert(flag == false)
+end
+tests.add(event_remove_listener)
+
+function event_repeat_listeners()
+	local fl = function() end
+	local fa = function() end
+	local e = event_t:new()
+	assert(e:repeat_listeners() == 0)
+	e:listen(fl)
+	assert(e:repeat_listeners() == 1)
+	e:await(fa)
+	assert(e:repeat_listeners() == 1)
+	e:remove_listener(fl)
+	assert(e:repeat_listeners() == 0)
+	e:remove_listener(fl)
+	assert(e:repeat_listeners() == 0)
+	e:remove_listener(fa)
+	assert(e:repeat_listeners() == 0)
+end
+tests.add(event_repeat_listeners)
+
 function tasks_start_with_state_ready()
 	local ta = task_t:new(function() end)
 	local tb = task_t:new(function() end)

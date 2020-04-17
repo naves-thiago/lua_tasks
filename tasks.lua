@@ -5,14 +5,22 @@ local task_t = {}
 local future_t = {}
 local timer_t = {}
 local scheduler = {current = nil, waiting = {}, timestamp = 0, waiting_time = heap:new()}
+local table_unpack
+
+-- Lua 5.1 compatibility
+if _VERSION == "Lua 5.1" then
+	table_unpack = unpack
+else
+	table_unpack = table.unpack
+end
 
 -- Param forwarding
-local function pack(...)
+local function va_pack(...)
 	return {[0]=select("#", ...), ...}
 end
 
-local function unpack(t)
-	return table.unpack(t, 1, t[0])
+local function va_unpack(t)
+	return table_unpack(t, 1, t[0])
 end
 
 -- Observer / Event API
@@ -90,7 +98,7 @@ function task_t:__call(no_await, independent)
 	end
 	self.state = "alive"
 	self.parent = scheduler.current
-	self.coroutine = coroutine.create(function() self.ret_val = pack(self.f()) self:kill() end)
+	self.coroutine = coroutine.create(function() self.ret_val = va_pack(self.f()) self:kill() end)
 	scheduler.current = self
 	if self.parent and not independent then
 		self.suicide_cb = function() self:kill() end
@@ -103,7 +111,7 @@ function task_t:__call(no_await, independent)
 		await(self)
 	end
 	if success and self.ret_val then
-		return unpack(self.ret_val)
+		return va_unpack(self.ret_val)
 	end
 	if not success then
 		print("Error in the task '" .. self.name .. "'")
@@ -138,7 +146,7 @@ end
 
 function task_t:result()
 	if self.ret_val then
-		return unpack(self.ret_val)
+		return va_unpack(self.ret_val)
 	end
 end
 
@@ -275,7 +283,7 @@ function future_t:new(evt_id)
 	scheduler.waiting[out] = event_t:new()
 
 	out.listener = function(_, ...)
-		out.data = pack(...)
+		out.data = va_pack(...)
 		out.state = "done"
 		emit(out, ...)
 	end
@@ -289,7 +297,7 @@ end
 -- Return: Event data if the future is done or nothing if cancelled.
 function future_t:get()
 	if self.state == "done" then
-		return unpack(self.data)
+		return va_unpack(self.data)
 	elseif self.state == "cancelled" then
 		return
 	else
@@ -418,8 +426,8 @@ module.par_or = par_or
 module.par_and = par_and
 module.listen = listen
 module.stop_listening = stop_listening
-module.pack = pack
-module.unpack = unpack
+module.pack = va_pack
+module.unpack = va_unpack
 module.now_ms = now_ms
 module.in_ms = in_ms
 module.timer_t = timer_t

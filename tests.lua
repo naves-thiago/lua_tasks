@@ -1,5 +1,5 @@
 local tasks = require"tasks"
-setmetatable(_ENV, {__index = tasks})
+setmetatable(_G, {__index = tasks})
 
 tests = {}
 function tests.add(f)
@@ -1208,7 +1208,7 @@ local fname = {}
 for _, f in ipairs(tests) do
 	fname[f] = true
 end
-for name, f in pairs(_ENV) do
+for name, f in pairs(_G) do
 	if fname[f] then
 		fname[f] = name
 	end
@@ -1218,7 +1218,7 @@ end
 if #arg > 0 then
 	local t = {}
 	for _, name in ipairs(arg) do
-		local f = _ENV[name]
+		local f = _G[name]
 		if type(f) == "function" then
 			table.insert(t, f)
 		end

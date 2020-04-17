@@ -14,6 +14,12 @@ else
 	table_unpack = table.unpack
 end
 
+----- DEBUG -----
+function trace(...)
+	--print(table.concat({"[TRACE]", ...}, ' '))
+end
+-----------------
+
 -- Param forwarding
 local function va_pack(...)
 	return {[0]=select("#", ...), ...}
@@ -88,11 +94,13 @@ end
 
 function task_t:new(f, name)
 	local t = {f = f, done = event_t:new(), state = "ready", parent = nil, coroutine = nil, name = name or "??"}
+	trace("New task:", name)
 	return setmetatable(t, {__index = self, __call = self.__call})
 end
 
 -- If no_wait is true, the caller will not yield to wait for this task to complete
 function task_t:__call(no_await, independent)
+	trace("Start task:", self.name, "State:", self.state, "Caller:", (scheduler.current and scheduler.current.name))
 	if self.state ~= "ready" then
 		return
 	end
@@ -109,6 +117,7 @@ function task_t:__call(no_await, independent)
 		-- Started from another task
 		self.done:listen(function(_, ...) emit(self, ...) end)
 		await(self)
+		trace("Unblock parent:", self.name, "Parent:", self.parent.name)
 	end
 	if success and self.ret_val then
 		return va_unpack(self.ret_val)
@@ -121,6 +130,7 @@ function task_t:__call(no_await, independent)
 end
 
 function task_t:kill()
+	trace("Kill task:", self.name, "State:", self.state)
 	if self.state == "dead" then
 		return
 	end
@@ -159,12 +169,14 @@ end
 local function _await_obj(evt)
 	local curr = scheduler.current
 	evt:await(function(_, ...)
+			trace("Resume task:", curr.name, "State:", curr.state)
 			if curr.state ~= "dead" then
 				scheduler.current = curr
 				coroutine.resume(curr.coroutine, ...)
 			end
 		end)
 
+	trace("Yield task: ", curr.name, "State: ", curr.state)
 	scheduler.current = curr.parent
 	return coroutine.yield()
 end
@@ -173,6 +185,7 @@ end
 -- Param evt_id: Event identifier. Can be any valid table key.
 -- Returns the parameters sent to emit() (minus the event id).
 local function await(evt_id)
+	trace("Await:", tostring(evt_id), "Task:", scheduler.current.name)
 	local waiting = scheduler.waiting
 	if not scheduler.current then
 		return
@@ -185,6 +198,7 @@ local function await(evt_id)
 end
 
 local function emit(evt_id, ...)
+	trace("Emit:", tostring(evt_id))
 	local e = scheduler.waiting[evt_id]
 	if e then
 		e(...)

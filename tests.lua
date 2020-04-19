@@ -70,24 +70,6 @@ function event_remove_listener()
 end
 tests.add(event_remove_listener)
 
-function event_repeat_listeners()
-	local fl = function() end
-	local fa = function() end
-	local e = event_t:new()
-	assert(e:repeat_listeners() == 0)
-	e:listen(fl)
-	assert(e:repeat_listeners() == 1)
-	e:await(fa)
-	assert(e:repeat_listeners() == 1)
-	e:remove_listener(fl)
-	assert(e:repeat_listeners() == 0)
-	e:remove_listener(fl)
-	assert(e:repeat_listeners() == 0)
-	e:remove_listener(fa)
-	assert(e:repeat_listeners() == 0)
-end
-tests.add(event_repeat_listeners)
-
 function tasks_start_with_state_ready()
 	local ta = task_t:new(function() end)
 	local tb = task_t:new(function() end)

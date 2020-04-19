@@ -34,15 +34,34 @@ end
 -- Instantiates a new event_t object.
 -- This class provides an observable object able to call multiple listeners and copy data to each one.
 function event_t:new()
-	return setmetatable({listeners = {}, rep_listeners = 0}, {__index = self, __call = self.__call})
+	-- new_listeners is used to store listeners added while we are executing __call, so we only
+	-- execute those the next time __call is executed
+	return setmetatable({listeners = {}, new_listeners = {}, _listener_count = 0, in_call = false},
+		{__index = self, __call = self.__call})
 end
 
 -- Adds a new listener to this event. This listener will be executed every time this event is triggered.
 -- If the callback is already a listener on this event, change it to be executed every time.
 -- Param f: Callback function. May receive any number of parameters (those will be forwarded from __call()).
 function event_t:listen(f)
-	if self.listeners[f] ~= "repeat" then
-		self.rep_listeners = self.rep_listeners + 1
+	if self.listeners[f] == "repeat" or self.new_listeners[f] == "repeat" then
+		return
+	end
+
+	if self.listeners[f] == "once" then
+		self.listeners[f] = "repeat"
+		return
+	end
+
+	if self.new_listeners[f] == "once" then
+		self.new_listeners[f] = "repeat"
+		return
+	end
+
+	self._listener_count = self._listener_count + 1
+	if self.in_call then
+		self.new_listeners[f] = "repeat"
+	else
 		self.listeners[f] = "repeat"
 	end
 end
@@ -51,35 +70,68 @@ end
 -- If the callback is already a listener on this event, change it to be executed once.
 -- Param f: Callback function. May receive any number of parameters (those will be forwarded from __call()).
 function event_t:await(f)
-	if self.listeners[f] == "repeat" then
-		self.rep_listeners = self.rep_listeners - 1
+	if self.listeners[f] == "once" or self.new_listeners[f] == "once" then
+		return
 	end
-	self.listeners[f] = "once"
+
+	if self.listeners[f] == "repeat" then
+		self.listeners[f] = "once"
+		return
+	end
+
+	if self.new_listeners[f] == "repeat" then
+		self.new_listeners[f] = "once"
+		return
+	end
+
+	self._listener_count = self._listener_count + 1
+	if self.in_call then
+		self.new_listeners[f] = "once"
+	else
+		self.listeners[f] = "once"
+	end
 end
 
 -- Removes a callback function from this event.
 -- Param f: Callback function. Ignored if not a listener.
 function event_t:remove_listener(f)
-	if self.listeners[f] == "repeat" then
-		self.rep_listeners = self.rep_listeners - 1
+	if self.listeners[f] or self.new_listeners[f] then
+		self._listener_count = self._listener_count - 1
 	end
 	self.listeners[f] = nil
+	self.new_listeners[f] = nil
 end
 
--- Returns the number of listeners set to execute every time this event is triggered (i.e. added via listen()).
-function event_t:repeat_listeners()
-	return self.rep_listeners
+-- Returns the number of listeners
+function event_t:listener_count()
+	return self._listener_count
 end
 
 -- Triggers this event: Executes all the listeners and forward all parameters to each listener.
 -- The order of execution of the listeners is not defined.
 function event_t:__call(...)
+	-- This function is not reentrant. Do not emit the event that unblocked the current task!
+	-- Doing:
+	-- `local nl = self.new_listeners`
+	-- `self.new_listeners {}`
+	-- calling the new_listeners on the inner calls
+	-- `[...] self.new_listeners = nl`
+	-- replacing `if self.in_call` with `if self.new_listeners` everywhere
+	-- may allow it to be reentrant
+	--
+	self.in_call = true
 	for l, mode in pairs(self.listeners) do
-		l(self, ...)
 		if mode == "once" then
 			self.listeners[l] = nil
+			self._listener_count = self._listener_count - 1
 		end
+		l(self, ...) -- Must be after `if mode ...`, otherwise may break if `l()` calls `:await()`
 	end
+	for l, mode in pairs(self.new_listeners) do
+		self.listeners[l] = mode
+	end
+	self.new_listeners = {}
+	self.in_call = false
 end
 
 -- Task
@@ -202,7 +254,7 @@ local function emit(evt_id, ...)
 	local e = scheduler.waiting[evt_id]
 	if e then
 		e(...)
-		if e:repeat_listeners() == 0 then
+		if e:listener_count() == 0 then
 			scheduler.waiting[evt_id] = nil
 		end
 	end
@@ -210,9 +262,11 @@ end
 
 local function par_or(...)
 	local tasks = {...}
+	local i = 1
 	for i, v in ipairs(tasks) do
 		if type(v) == "function" then
-			tasks[i] = task_t:new(v)
+			tasks[i] = task_t:new(v, "par_or_" .. i)
+			i = i + 1
 		end
 	end
 	local uuid = tasks -- Reuse the tasks table as an unique event ID for this call
@@ -224,19 +278,20 @@ local function par_or(...)
 				t(true)
 			end
 			return await(uuid)
-		end)
+		end, "par_or")
 	for _, t in ipairs(tasks) do
 		t.done:listen(done_cb)
 	end
-	task.name = "par_or"
 	return task
 end
 
 local function par_and(...)
 	local tasks = {...}
+	local i = 1
 	for i, v in ipairs(tasks) do
 		if type(v) == "function" then
-			tasks[i] = task_t:new(v)
+			tasks[i] = task_t:new(v, "par_and_" .. i)
+			i = i + 1
 		end
 	end
 	local uuid = tasks -- Reuse the tasks table as an unique event ID for this call
@@ -256,7 +311,7 @@ local function par_and(...)
 				t(true)
 			end
 			await(uuid)
-		end)
+		end, "par_and")
 end
 
 -- Registers a callback to be called when the an event occurs.
@@ -450,5 +505,6 @@ module.now_ms = now_ms
 module.in_ms = in_ms
 module.every_ms = every_ms
 module.await_ms = await_ms
+module._scheduler = scheduler
 
 return module

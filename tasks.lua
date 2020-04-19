@@ -220,13 +220,20 @@ end
 -- Returns the parameters sent to emit() (minus the event id).
 local function _await_obj(evt)
 	local curr = scheduler.current
-	evt:await(function(_, ...)
-			trace("Resume task:", curr.name, "State:", curr.state)
-			if curr.state ~= "dead" then
-				scheduler.current = curr
-				coroutine.resume(curr.coroutine, ...)
-			end
-		end)
+	local event_cb, done_cb
+	function event_cb(_, ...)
+		trace("Resume task:", curr.name, "State:", curr.state)
+		if curr.state ~= "dead" then
+			scheduler.current = curr
+			curr.done:remove_listener(done_cb)
+			coroutine.resume(curr.coroutine, ...)
+		end
+	end
+	function done_cb()
+		evt:remove_listener(event_cb)
+	end
+	curr.done:await(done_cb)
+	evt:await(event_cb)
 
 	trace("Yield task: ", curr.name, "State: ", curr.state)
 	scheduler.current = curr.parent

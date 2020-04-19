@@ -224,6 +224,19 @@ function await_returns_emit_params()
 end
 tests.add(await_returns_emit_params)
 
+function task_kill_removes_await_listener()
+	_scheduler.waiting[1] = nil
+
+	local ta = task_t:new(function() await(1) end)
+	ta()
+	assert(_scheduler.waiting[1] ~= nil)
+	assert(_scheduler.waiting[1]:listener_count() == 1)
+
+	ta:kill()
+	assert(_scheduler.waiting[1]:listener_count() == 0)
+end
+tests.add(task_kill_removes_await_listener)
+
 function inner_task_blocks_outer_task()
 	local x = 0
 	local ta = task_t:new(function() await(1) end)

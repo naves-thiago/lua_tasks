@@ -267,6 +267,19 @@ function outer_task_kills_inner_task()
 end
 tests.add(outer_task_kills_inner_task)
 
+function inner_task_removes_done_listener_from_parent_on_kill()
+	local ta = task_t:new(function() await(1) end)
+	local tb = task_t:new(function() ta() coroutine.yield() end)
+	assert(tb.done:listener_count() == 0)
+	tb()
+	assert(tb.done:listener_count() == 2)
+	assert(tb.done.listeners[ta.suicide_cb])
+	ta:kill()
+	assert(tb.done.listeners[ta.suicide_cb] == nil)
+	assert(tb.done:listener_count() == 0)
+end
+tests.add(inner_task_removes_done_listener_from_parent_on_kill)
+
 function task_no_wait_execution()
 	local x = 0
 	local ta = task_t:new(function() await(1) end)

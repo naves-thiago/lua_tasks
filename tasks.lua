@@ -191,6 +191,9 @@ function task_t:kill()
 	if scheduler.current == self then
 		scheduler.current = self.parent
 	end
+	if self.parent and self.parent.done then
+		self.parent.done:remove_listener(self.suicide_cb)
+	end
 	self.f = nil
 	self.done = nil
 	self.parent = nil

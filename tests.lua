@@ -122,6 +122,57 @@ function event_listener_count()
 end
 tests.add(event_listener_count)
 
+function event_add_listener_in_callback()
+	local count_inside = 0
+	local e = event_t:new()
+	local l1_exec = false
+	local l2_exec = false
+	local function l2() l2_exec = true end
+	local function l1()
+		l1_exec = true
+		e:listen(l2)
+		count_inside = e:listener_count()
+	end
+
+	e:listen(l1)
+	assert(e:listener_count() == 1)
+	e()
+	assert(l1_exec == true)
+	assert(l2_exec == false)
+	assert(e:listener_count() == 2)
+	l1_exec = false
+	e()
+	assert(l1_exec == true)
+	assert(l2_exec == true)
+end
+tests.add(event_add_listener_in_callback)
+
+function event_add_await_in_callback()
+	local count_inside = 0
+	local e = event_t:new()
+	local a1_exec = false
+	local a2_exec = false
+	local function a2() a2_exec = true end
+	local function a1()
+		a1_exec = true
+		e:await(a2)
+		count_inside = e:listener_count()
+	end
+
+	e:await(a1)
+	assert(e:listener_count() == 1)
+	e()
+	assert(e:listener_count() == 1)
+	assert(a1_exec == true)
+	assert(a2_exec == false)
+	a1_exec = false
+	e()
+	assert(e:listener_count() == 0)
+	assert(a1_exec == false)
+	assert(a2_exec == true)
+end
+tests.add(event_add_await_in_callback)
+
 function tasks_start_with_state_ready()
 	local ta = task_t:new(function() end)
 	local tb = task_t:new(function() end)

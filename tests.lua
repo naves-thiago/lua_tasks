@@ -70,6 +70,58 @@ function event_remove_listener()
 end
 tests.add(event_remove_listener)
 
+function event_listener_count()
+	local function l1() end
+	local function l2() end
+	local function a1() end
+	local function a2() end
+	local e = event_t:new()
+	assert(e:listener_count() == 0)
+
+	e:remove_listener(l1)
+	assert(e:listener_count() == 0)
+
+	e:listen(l1)
+	assert(e:listener_count() == 1)
+
+	e:await(a1)
+	assert(e:listener_count() == 2)
+
+	e:await(a2)
+	assert(e:listener_count() == 3)
+
+	e:listen(l2)
+	assert(e:listener_count() == 4)
+
+	e:await(l2) -- change listen -> await
+	assert(e:listener_count() == 4)
+
+	e:remove_listener(function() end) -- Remove non-listener
+	assert(e:listener_count() == 4)
+
+	e:remove_listener(l2)
+	assert(e:listener_count() == 3)
+
+	e:listen(a2) -- change await -> listen
+	assert(e:listener_count() == 3)
+
+	e:remove_listener(a2)
+	assert(e:listener_count() == 2)
+
+	e:remove_listener(a1)
+	assert(e:listener_count() == 1)
+
+	e:remove_listener(a1) -- Remove already removed
+	assert(e:listener_count() == 1)
+
+	e:remove_listener(l1)
+	assert(e:listener_count() == 0)
+
+	e:remove_listener(l1) -- Remove already removed when empty
+	assert(e:listener_count() == 0)
+end
+tests.add(event_listener_count)
+
 function tasks_start_with_state_ready()
 	local ta = task_t:new(function() end)
 	local tb = task_t:new(function() end)

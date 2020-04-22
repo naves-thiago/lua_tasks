@@ -53,6 +53,9 @@ function love.load()
 		par_or(
 			function()
 				while true do
+					if interval < 50 then
+						interval = 50
+					end
 					await_ms(interval)
 					led1 = not led1
 				end

@@ -23,13 +23,19 @@ SOFTWARE.
 --]]
 
 local heap = require"BinaryMinHeap"
-local module = {}
+local m = {} -- module
 local event_t = {}
 local task_t = {}
 local future_t = {}
 local timer_t = {}
 local scheduler = {current = nil, waiting = {}, timestamp = 0, waiting_time = heap:new()}
 local table_unpack
+
+m.event_t    = event_t
+m.task_t     = task_t
+m.future_t   = future_t
+m.timer_t    = timer_t
+m._scheduler = scheduler
 
 -- Lua 5.1 compatibility
 if _VERSION == "Lua 5.1" then
@@ -39,17 +45,17 @@ else
 end
 
 ----- DEBUG -----
-function trace(...)
+local function trace(...)
 	--print(table.concat({"[TRACE]", ...}, ' '))
 end
 -----------------
 
 -- Param forwarding
-local function va_pack(...)
+function m.pack(...)
 	return {[0]=select("#", ...), ...}
 end
 
-local function va_unpack(t)
+function m.unpack(t)
 	return table_unpack(t, 1, t[0])
 end
 
@@ -182,7 +188,7 @@ function task_t:__call(no_await, independent)
 	end
 	self.state = "alive"
 	self.parent = scheduler.current
-	self.coroutine = coroutine.create(function() self.ret_val = va_pack(self.f()) self:kill() end)
+	self.coroutine = coroutine.create(function() self.ret_val = m.pack(self.f()) self:kill() end)
 	scheduler.current = self
 	if self.parent and not independent then
 		self.suicide_cb = function() self:kill() end
@@ -191,12 +197,12 @@ function task_t:__call(no_await, independent)
 	local success, output = coroutine.resume(self.coroutine)
 	if success and self.parent and not no_await then
 		-- Started from another task
-		self.done:listen(function(_, ...) emit(self, ...) end)
-		await(self)
+		self.done:listen(function(_, ...) m.emit(self, ...) end)
+		m.await(self)
 		trace("Unblock parent:", self.name, "Parent:", self.parent.name)
 	end
 	if success and self.ret_val then
-		return va_unpack(self.ret_val)
+		return m.unpack(self.ret_val)
 	end
 	if not success then
 		print("Error in the task '" .. self.name .. "'")
@@ -235,7 +241,7 @@ end
 
 function task_t:result()
 	if self.ret_val then
-		return va_unpack(self.ret_val)
+		return m.unpack(self.ret_val)
 	end
 end
 
@@ -270,7 +276,7 @@ end
 -- Blocks the caller task until the <evt> event is emitted.
 -- Param evt_id: Event identifier. Can be any valid table key.
 -- Returns the parameters sent to emit() (minus the event id).
-local function await(evt_id)
+function m.await(evt_id)
 	trace("Await:", tostring(evt_id), "Task:", scheduler.current.name)
 	local waiting = scheduler.waiting
 	if not scheduler.current then
@@ -283,7 +289,7 @@ local function await(evt_id)
 	return _await_obj(waiting[evt_id])
 end
 
-local function emit(evt_id, ...)
+function m.emit(evt_id, ...)
 	trace("Emit:", tostring(evt_id))
 	local e = scheduler.waiting[evt_id]
 	if e then
@@ -294,7 +300,7 @@ local function emit(evt_id, ...)
 	end
 end
 
-local function par_or(...)
+function m.par_or(...)
 	local tasks = {...}
 	local i = 1
 	for i, v in ipairs(tasks) do
@@ -305,13 +311,13 @@ local function par_or(...)
 	end
 	local uuid = tasks -- Reuse the tasks table as an unique event ID for this call
 	local done_cb = function(_, task)
-		emit(uuid, task:result())
+		m.emit(uuid, task:result())
 	end
 	local task = task_t:new(function()
 			for _, t in ipairs(tasks) do
 				t(true)
 			end
-			return await(uuid)
+			return m.await(uuid)
 		end, "par_or")
 	for _, t in ipairs(tasks) do
 		t.done:listen(done_cb)
@@ -319,7 +325,7 @@ local function par_or(...)
 	return task
 end
 
-local function par_and(...)
+function m.par_and(...)
 	local tasks = {...}
 	local i = 1
 	for i, v in ipairs(tasks) do
@@ -333,7 +339,7 @@ local function par_and(...)
 	local done_cb = function()
 			pending = pending - 1
 			if pending == 0 then
-				emit(uuid)
+				m.emit(uuid)
 			end
 		end
 
@@ -344,7 +350,7 @@ local function par_and(...)
 			for _, t in ipairs(tasks) do
 				t(true)
 			end
-			await(uuid)
+			m.await(uuid)
 		end, "par_and")
 end
 
@@ -353,7 +359,7 @@ end
 -- Param evt_id: Event identifier.
 -- Param callback: The callback function.
 -- Param once: If true, the callback will be called only on the next time the event occurs (instead of everytime).
-local function listen(evt_id, callback, once)
+function m.listen(evt_id, callback, once)
 	local event = scheduler.waiting[evt_id] or event_t:new()
 	scheduler.waiting[evt_id] = event
 	if once then
@@ -367,7 +373,7 @@ end
 -- If <callback> is not in the event's listeners, does nothing.
 -- Param evt_id: Event identifier.
 -- Param callback: The callback function.
-local function stop_listening(evt_id, callback)
+function m.stop_listening(evt_id, callback)
 	if not scheduler.waiting[evt_id] then
 		return
 	end
@@ -386,9 +392,9 @@ function future_t:new(evt_id)
 	scheduler.waiting[out] = event_t:new()
 
 	out.listener = function(_, ...)
-		out.data = va_pack(...)
+		out.data = m.pack(...)
 		out.state = "done"
-		emit(out, ...)
+		m.emit(out, ...)
 	end
 	scheduler.waiting[evt_id]:await(out.listener)
 	return out
@@ -400,11 +406,11 @@ end
 -- Return: Event data if the future is done or nothing if cancelled.
 function future_t:get()
 	if self.state == "done" then
-		return va_unpack(self.data)
+		return m.unpack(self.data)
 	elseif self.state == "cancelled" then
 		return
 	else
-		return await(self)
+		return m.await(self)
 	end
 end
 
@@ -420,7 +426,7 @@ function future_t:cancel()
 	end
 	scheduler.waiting[self.evt_id]:remove_listener(self.listener)
 	self.state = "cancelled"
-	emit(self)
+	m.emit(self)
 	scheduler.waiting[self] = nil
 end
 
@@ -472,7 +478,7 @@ end
 
 -- Increments the current timestamp.
 -- Param dt: Elapsed time since last call to this function (or the program starting) in milliseconds.
-local function update_time(dt)
+function m.update_time(dt)
 	scheduler.timestamp = scheduler.timestamp + dt
 	local waiting_time = scheduler.waiting_time
 	while true do
@@ -487,7 +493,7 @@ local function update_time(dt)
 end
 
 -- Get current time in milliseconds.
-local function now_ms()
+function m.now_ms()
 	return scheduler.timestamp
 end
 
@@ -495,7 +501,7 @@ end
 -- Param ms: Period in milliseconds to wait before executing the callback.
 -- Param cb: Callback function.
 -- Return: timer_t instance - the timer controlling this operation.
-local function in_ms(ms, cb)
+function m.in_ms(ms, cb)
 	local timer = timer_t:new(ms, cb, false)
 	timer:start()
 	return timer
@@ -505,7 +511,7 @@ end
 -- Param ms: Period of execution in milliseconds.
 -- Param cb: Callback function.
 -- Return: timer_t instance - the timer controlling this operation.
-local function every_ms(ms, cb)
+function m.every_ms(ms, cb)
 	local timer = timer_t:new(ms, cb, true)
 	timer:start()
 	return timer
@@ -513,32 +519,16 @@ end
 
 -- Blocks the caller task for <ms> milliseconds.
 -- Param ms: Amount of time to block the task for.
-local function await_ms(ms)
+function m.await_ms(ms)
 	local evt = event_t:new()
-	in_ms(ms, evt)
+	m.in_ms(ms, evt)
 	_await_obj(evt)
 end
 
--- Module API
-module.event_t = event_t
-module.task_t = task_t
-module.future_t = future_t
-module.await = await
-module.emit = emit
-module.par_or = par_or
-module.par_and = par_and
-module.listen = listen
-module.stop_listening = stop_listening
-module.pack = va_pack
-module.unpack = va_unpack
-module.now_ms = now_ms
-module.in_ms = in_ms
-module.timer_t = timer_t
-module.update_time = update_time
-module.now_ms = now_ms
-module.in_ms = in_ms
-module.every_ms = every_ms
-module.await_ms = await_ms
-module._scheduler = scheduler
-
-return module
+-- Module export
+if _VERSION == "Lua 5.1" then
+	_G[...] = m
+	module(..., package.seeall)
+else
+	return m
+end

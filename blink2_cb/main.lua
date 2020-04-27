@@ -8,7 +8,6 @@
 --------------------------------------------------------------------
 
 local tasks = require("tasks")
-setmetatable(_G, {__index = tasks})
 
 local timer, blinker
 local state = "blink"
@@ -16,7 +15,7 @@ local interval = 500
 local sm -- generated state machine
 
 local function start_timer()
-	timer = in_ms(500, function() update_state("timeout") end)
+	timer = tasks.in_ms(500, function() update_state("timeout") end)
 end
 
 local function stop_timer()
@@ -77,9 +76,9 @@ function love.load()
 		if interval < 50 then
 			interval = 50
 		end
-		blinker = in_ms(interval, f)
+		blinker = tasks.in_ms(interval, f)
 	end
-	blinker = in_ms(interval, f)
+	blinker = tasks.in_ms(interval, f)
 end
 
 function love.update(dt)

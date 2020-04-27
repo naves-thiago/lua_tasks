@@ -8,7 +8,13 @@
 --------------------------------------------------------------------
 
 local tasks = require("tasks")
-setmetatable(_G, {__index = tasks})
+
+local await = tasks.await
+local emit = tasks.emit
+local await_ms = tasks.await_ms
+local update_time = tasks.update_time
+local par_or = tasks.par_or
+local par_and = tasks.par_and
 
 local main_task
 local interval = 500
@@ -67,17 +73,17 @@ function love.load()
 end
 
 function love.update(dt)
-	tasks.update_time(dt * 1000)
+	update_time(dt * 1000)
 end
 
 function love.keypressed(key, scancode, isrepeat)
 	if isrepeat then return end
-	tasks.emit(key .. "_down")
+	emit(key .. "_down")
 end
 
 function love.keyreleased(key, scancode, isrepeat)
 	if isrepeat then return end
-	tasks.emit(key .. "_up")
+	emit(key .. "_up")
 end
 
 function love.draw()

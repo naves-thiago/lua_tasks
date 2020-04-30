@@ -66,7 +66,9 @@ end
 function event_t:new()
 	-- new_listeners is used to store listeners added while we are executing __call, so we only
 	-- execute those the next time __call is executed
-	return setmetatable({listeners = {}, new_listeners = {}, _listener_count = 0, in_call = false},
+	-- TODO explain _updated_listeners
+	return setmetatable({listeners = {}, new_listeners = {}, _updated_listeners = {},
+		_listener_count = 0, in_call = 0},
 		{__index = self, __call = self.__call})
 end
 
@@ -74,24 +76,12 @@ end
 -- If the callback is already a listener on this event, change it to be executed every time.
 -- Param f: Callback function. May receive any number of parameters (those will be forwarded from __call()).
 function event_t:listen(f)
-	if self.listeners[f] == "repeat" or self.new_listeners[f] == "repeat" then
-		return
-	end
-
-	if self.listeners[f] == "once" then
-		self.listeners[f] = "repeat"
-		return
-	end
-
-	if self.new_listeners[f] == "once" then
-		self.new_listeners[f] = "repeat"
-		return
-	end
-
-	self._listener_count = self._listener_count + 1
-	if self.in_call then
+	if self.in_call > 0 then
 		self.new_listeners[f] = "repeat"
 	else
+		if not self.listeners[f] then
+			self._listener_count = self._listener_count + 1
+		end
 		self.listeners[f] = "repeat"
 	end
 end
@@ -100,24 +90,12 @@ end
 -- If the callback is already a listener on this event, change it to be executed once.
 -- Param f: Callback function. May receive any number of parameters (those will be forwarded from __call()).
 function event_t:await(f)
-	if self.listeners[f] == "once" or self.new_listeners[f] == "once" then
-		return
-	end
-
-	if self.listeners[f] == "repeat" then
-		self.listeners[f] = "once"
-		return
-	end
-
-	if self.new_listeners[f] == "repeat" then
-		self.new_listeners[f] = "once"
-		return
-	end
-
-	self._listener_count = self._listener_count + 1
-	if self.in_call then
+	if self.in_call > 0 then
 		self.new_listeners[f] = "once"
 	else
+		if not self.listeners[f] then
+			self._listener_count = self._listener_count + 1
+		end
 		self.listeners[f] = "once"
 	end
 end
@@ -125,11 +103,14 @@ end
 -- Removes a callback function from this event.
 -- Param f: Callback function. Ignored if not a listener.
 function event_t:remove_listener(f)
-	if self.listeners[f] or self.new_listeners[f] then
-		self._listener_count = self._listener_count - 1
+	if self.in_call > 0 then
+		self.new_listeners[f] = "del"
+	elseif self.listeners[f] then
+		if self.listeners[f] then
+			self._listener_count = self._listener_count - 1
+		end
+		self.listeners[f] = nil
 	end
-	self.listeners[f] = nil
-	self.new_listeners[f] = nil
 end
 
 -- Returns the number of listeners
@@ -139,29 +120,68 @@ end
 
 -- Triggers this event: Executes all the listeners and forward all parameters to each listener.
 -- The order of execution of the listeners is not defined.
+-- Returns true if not executed from a listener of this same event
 function event_t:__call(...)
-	-- This function is not reentrant. Do not emit the event that unblocked the current task!
-	-- Doing:
-	-- `local nl = self.new_listeners`
-	-- `self.new_listeners {}`
-	-- calling the new_listeners on the inner calls
-	-- `[...] self.new_listeners = nl`
-	-- replacing `if self.in_call` with `if self.new_listeners` everywhere
-	-- may allow it to be reentrant
-	--
-	self.in_call = true
-	for l, mode in pairs(self.listeners) do
+	if self.in_call >  0 then
+		-- Nested call: new_listeners from the outter call are listeners to this one.
+		-- Merge listeners and new_listeners into a NEW table (as to not modify the current one
+		-- which is being used by the outter call).
+		local listeners = {}
+		for l, mode in pairs(self.listeners) do
+			listeners[l] = mode
+		end
+		for l, mode in pairs(self.new_listeners) do
+			if mode == "del" then
+				listeners[l] = nil
+			else
+				listeners[l] = mode
+			end
+		end
+		self.listeners = listeners
+	end
+
+	local listeners = self.listeners
+	local nl = self.new_listeners
+	self.new_listeners = {} -- TODO create this only if needed
+	self.in_call = self.in_call + 1
+
+	-- Execute listeners
+	for l, mode in pairs(listeners) do
 		if mode == "once" then
-			self.listeners[l] = nil
-			self._listener_count = self._listener_count - 1
+			self:remove_listener(l)
+			--self.new_listeners[l] = self.new_listeners[l] or "del"
 		end
 		l(self, ...) -- Must be after `if mode ...`, otherwise may break if `l()` calls `:await()`
 	end
+
+	-- Update listeners
 	for l, mode in pairs(self.new_listeners) do
-		self.listeners[l] = mode
+		--if not self.listeners[l] or not self._updated_listeners[l] = nil then
+		-- Prevent overriding changes made in latter (inner) calls
+		if self._updated_listeners[l] == nil then
+			self._updated_listeners[l] = mode
+			if mode == "del" then
+				self.listeners[l] = nil
+			else
+				self.listeners[l] = mode
+			end
+		end
 	end
-	self.new_listeners = {}
-	self.in_call = false
+
+	-- Fix _listener_count
+	local count = 0
+	for _ in pairs(self.listeners) do
+		count = count + 1
+	end
+	self._listener_count = count
+
+	self.new_listeners = nl
+	self.in_call = self.in_call - 1
+	if self.in_call == 0 then
+		self._updated_listeners = {}
+	end
+
+	return self.in_call == 0
 end
 
 -- Task

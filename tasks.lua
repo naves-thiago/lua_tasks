@@ -180,7 +180,11 @@ function task_t:new(f, name)
 	return setmetatable(t, {__index = self, __call = self.__call})
 end
 
--- If no_wait is true, the caller will not yield to wait for this task to complete
+-- Starts the task execution
+-- Param no_wait: If true, the caller will not yield to wait for this task to complete
+-- Param independent: Do not kill this task when the calling (parent) task die
+-- Returns: Same values returned by the task function (set in the constructor) if it returns before this function returns.
+-- i.e. __call will only return if no_wait is false or the task function return immediately.
 function task_t:__call(no_await, independent)
 	trace("Start task:", self.name, "State:", self.state, "Caller:", (scheduler.current and scheduler.current.name))
 	if self.state ~= "ready" then
@@ -194,9 +198,10 @@ function task_t:__call(no_await, independent)
 		self.suicide_cb = function() self:kill() end
 		self.parent.done:listen(self.suicide_cb)
 	end
-	local success, output = coroutine.resume(self.coroutine)
-	if success and self.parent and not no_await then
-		-- Started from another task
+	local success, error_message = coroutine.resume(self.coroutine)
+	if success and self.parent and coroutine.status(self.coroutine) ~= "dead" and not no_await then
+		-- Started from another task and not done yet
+		trace("Block parent:", self.name, "Parent:", self.parent.name)
 		self.done:listen(function(_, ...) m.emit(self, ...) end)
 		m.await(self)
 		trace("Unblock parent:", self.name, "Parent:", self.parent.name)
@@ -206,7 +211,7 @@ function task_t:__call(no_await, independent)
 	end
 	if not success then
 		print("Error in the task '" .. self.name .. "'")
-		print(debug.traceback(self.coroutine, output))
+		print(debug.traceback(self.coroutine, error_message))
 		print(task_parent_trace(self))
 	end
 end

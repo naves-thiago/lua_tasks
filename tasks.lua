@@ -216,6 +216,9 @@ function task_t:__call(no_await, independent)
 	end
 end
 
+-- Stops the task execution and execute the task's done event.
+-- Can be called from within the task itself or elsewhere.
+-- Unblocks the parent task if blocked on this task's __call.
 function task_t:kill()
 	trace("Kill task:", self.name, "State:", self.state)
 	if self.state == "dead" then
@@ -235,6 +238,12 @@ function task_t:kill()
 	self.coroutine = nil
 end
 
+-- Dissociates this task from its parent such that killing the parent
+-- task does not kill this task.
+-- If this is called from within the task itself, the parent blocked
+-- on __call WILL NOT BE UNBLOCKED.
+-- This should not be called while the task is running unless it was stated
+-- with no_wait = true.
 function task_t:disown()
     if self.parent == nil then
         return
@@ -244,13 +253,15 @@ function task_t:disown()
     self.suicide_cb = nil
 end
 
+-- Returns the values returned by the task's function.
+-- If the task has not yet finished its execution, nothing is returned.
 function task_t:result()
 	if self.ret_val then
 		return m.unpack(self.ret_val)
 	end
 end
 
--- Scheduler API
+-- Parallel  API
 
 -- Internal function.
 -- Blocks the caller task until the <evt> event is emitted.
@@ -278,7 +289,7 @@ local function _await_obj(evt)
 	return coroutine.yield()
 end
 
--- Blocks the caller task until the <evt> event is emitted.
+-- Blocks the caller task until the <evt_id> event is emitted.
 -- Param evt_id: Event identifier. Can be any valid table key.
 -- Returns the parameters sent to emit() (minus the event id).
 function m.await(evt_id)
@@ -294,6 +305,8 @@ function m.await(evt_id)
 	return _await_obj(waiting[evt_id])
 end
 
+-- Emits the <evt_id> event, sending the remaining parameters as data.
+-- Unblocks await calls waiting for this event and executes the listeners.
 function m.emit(evt_id, ...)
 	trace("Emit:", tostring(evt_id))
 	local e = scheduler.waiting[evt_id]
@@ -305,6 +318,12 @@ function m.emit(evt_id, ...)
 	end
 end
 
+-- Returns a task that starts multiple sub-tasks in parallel.
+-- If any of these tasks finishes or is killed, all the other tasks will be killed.
+-- The returned task's __call will return the same values returned by the task function
+-- of the first sub-task to finish.
+-- Params: Each parameter must be a task or a function.
+-- Functions will be wrapped in new tasks to allow parallel execution.
 function m.par_or(...)
 	local tasks = {...}
 	local i = 1
@@ -330,6 +349,10 @@ function m.par_or(...)
 	return task
 end
 
+-- Returns a task that starts multiple sub-tasks in parallel.
+-- The returned task finishes when all sub-tasks finish (or are killed).
+-- Params: Each parameter must be a task or a function.
+-- Functions will be wrapped in new tasks to allow parallel execution.
 function m.par_and(...)
 	local tasks = {...}
 	local i = 1
@@ -419,7 +442,7 @@ function future_t:get()
 	end
 end
 
--- Test if the future is done (i.e. the event was emitted).
+-- Tests if the future is done (i.e. the event was emitted).
 function future_t:is_done()
 	return self.state == "done"
 end

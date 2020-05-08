@@ -208,6 +208,30 @@ function tasks_start_with_state_ready()
 end
 tests.add(tasks_start_with_state_ready)
 
+function tasks_set_current_task()
+	assert(t._scheduler.current == nil)
+	local function is_curr(tsk) return t._scheduler.current == tsk end
+	local a1, a2, b1, b2
+	local ta, tb
+	ta = t.task_t:new(function() a1 = is_curr(ta) t.await(1) a2 = is_curr(ta) end)
+	assert(t._scheduler.current == nil)
+	ta()
+	t.emit(1)
+	assert(a1)
+	assert(a2)
+
+	ta = t.task_t:new(function() a1 = is_curr(ta) t.await(1) a2 = is_curr(ta) end)
+	tb = t.task_t:new(function() b1 = is_curr(tb) ta() b2 = is_curr(tb) end)
+	tb()
+	t.emit(1)
+	assert(a1)
+	assert(a2)
+	assert(b1)
+	assert(b2)
+	assert(t._scheduler.current == nil)
+end
+tests.add(tasks_set_current_task)
+
 function emit_without_await_does_nothing()
 	local x = 0
 	local function fa() t.await(1) x = 1 end

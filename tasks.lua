@@ -187,12 +187,11 @@ function task_t:__call(no_await, independent)
 	self.state = "alive"
 	self.parent = scheduler.current
 	self.coroutine = coroutine.create(function() self.ret_val = m.pack(self.f()) self:kill() end)
-	scheduler.current = self
 	if self.parent and not independent then
 		self.suicide_cb = function() self:kill() end
 		self.parent.done:listen(self.suicide_cb)
 	end
-	local success, error_message = coroutine.resume(self.coroutine)
+	local success, error_message = self:_resume()
 	if success and self.parent and coroutine.status(self.coroutine) ~= "dead" and not no_await then
 		-- Started from another task and not done yet
 		trace("Block parent:", self.name, "Parent:", self.parent.name)
@@ -220,9 +219,6 @@ function task_t:kill()
 	end
 	self.state = "dead"
 	self.done(self)
-	if scheduler.current == self then
-		scheduler.current = self.parent
-	end
 	if self.parent and self.parent.done then
 		self.parent.done:remove_listener(self.suicide_cb)
 	end
@@ -255,6 +251,18 @@ function task_t:result()
 	end
 end
 
+-- Internal function.
+-- Resumes the task's coroutine and updates scheduler.current
+function task_t:_resume(...)
+	local caller_task = scheduler.current
+	scheduler.current = self
+	trace("Resume task", self.name, "State", self.state, "Caller", caller_task and caller_task.name or "")
+	local success, error_message = coroutine.resume(self.coroutine, ...)
+	trace("Yield", self.name, "State", self.state, "Back to", caller_task and caller_task.name or "")
+	scheduler.current = caller_task
+	return success, error_message
+end
+
 -- Parallel  API
 
 -- Internal function.
@@ -265,11 +273,10 @@ local function _await_obj(evt)
 	local curr = scheduler.current
 	local event_cb, done_cb
 	function event_cb(_, ...)
-		trace("Resume task:", curr.name, "State:", curr.state)
+		trace("(Await) Resume task", curr.name, "State", curr.state)
 		if curr.state ~= "dead" then
-			scheduler.current = curr
 			curr.done:remove_listener(done_cb)
-			coroutine.resume(curr.coroutine, ...)
+			curr:_resume(...)
 		end
 	end
 	function done_cb()
@@ -278,8 +285,7 @@ local function _await_obj(evt)
 	curr.done:await(done_cb)
 	evt:await(event_cb)
 
-	trace("Yield task: ", curr.name, "State: ", curr.state)
-	scheduler.current = curr.parent
+	trace("(Await) Yield task", curr.name, "State", curr.state)
 	return coroutine.yield()
 end
 

@@ -141,14 +141,8 @@ end
 -- The order of execution of the listeners is not defined.
 function event_t:__call(...)
 	-- This function is not reentrant. Do not emit the event that unblocked the current task!
-	-- Doing:
-	-- `local nl = self.new_listeners`
-	-- `self.new_listeners {}`
-	-- calling the new_listeners on the inner calls
-	-- `[...] self.new_listeners = nl`
-	-- replacing `if self.in_call` with `if self.new_listeners` everywhere
-	-- may allow it to be reentrant
-	--
+
+	assert(not self.in_call, "Emitting or calling an event from within its listener or reaction is not supported.")
 	self.in_call = true
 	for l, mode in pairs(self.listeners) do
 		if mode == "once" then
@@ -334,8 +328,14 @@ function m.par_or(...)
 		end
 	end
 	local uuid = tasks -- Reuse the tasks table as an unique event ID for this call
+	local in_done_reaction = false
 	local done_cb = function(_, task)
-		m.emit(uuid, task:result())
+		if not in_done_reaction then
+			-- Prevent other subtasks from also emitting the event as we would still be
+			-- inside the event's reaction and therefore reenter event_t:__call
+			in_done_reaction = true
+			m.emit(uuid, task:result())
+		end
 	end
 	local task = task_t:new(function()
 			for _, t in ipairs(tasks) do

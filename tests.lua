@@ -284,6 +284,93 @@ function task_kill_removes_await_listener()
 end
 tests.add(task_kill_removes_await_listener)
 
+function task_kill_unblocks_parent()
+	local flag = false
+	local function fa() t.await(1) end
+	local ta = t.task_t:new(fa)
+	local function fb() ta() flag = true end
+	local tb = t.task_t:new(fb)
+	tb()
+	assert(ta.state == "alive")
+	assert(tb.state == "alive")
+	assert(not flag)
+	ta:kill()
+	assert(ta.state == "dead")
+	assert(tb.state == "dead")
+	assert(flag)
+end
+tests.add(task_kill_unblocks_parent)
+
+function task_kill_ends_par_or()
+	local ta = t.task_t:new(function () t.await(1) end)
+	local tp = t.par_or(ta, function() t.await(2) end)
+	tp()
+	assert(tp.state == "alive")
+	assert(ta.state == "alive")
+	ta:kill()
+	assert(tp.state == "dead")
+	assert(ta.state == "dead")
+end
+tests.add(task_kill_ends_par_or)
+
+function task_kill_counts_towards_par_and()
+	local ta = t.task_t:new(function () t.await(1) end)
+	local tp = t.par_and(ta, function() end)
+	tp()
+	assert(tp.state == "alive")
+	assert(ta.state == "alive")
+	ta:kill()
+	assert(tp.state == "dead")
+	assert(ta.state == "dead")
+end
+tests.add(task_kill_counts_towards_par_and)
+
+function task_suicide_unblocks_parent()
+	local flag = false
+	local ta
+	local function fa() t.await(1) ta:kill() t.await(2) end
+	ta = t.task_t:new(fa)
+	local function fb() ta() flag = true end
+	local tb = t.task_t:new(fb)
+	tb()
+	assert(ta.state == "alive")
+	assert(tb.state == "alive")
+	assert(not flag)
+	t.emit(1)
+	assert(ta.state == "dead")
+	assert(tb.state == "dead")
+	assert(flag)
+end
+tests.add(task_suicide_unblocks_parent)
+
+function task_suicide_ends_par_or()
+	local ta
+	local function fa() t.await(1) ta:kill() t.await(2) end
+	ta = t.task_t:new(fa)
+	local tp = t.par_or(ta, function() t.await(2) end)
+	tp()
+	assert(tp.state == "alive")
+	assert(ta.state == "alive")
+	t.emit(1)
+	assert(tp.state == "dead")
+	assert(ta.state == "dead")
+end
+tests.add(task_suicide_ends_par_or)
+
+function task_suicide_counts_towards_par_and()
+	local ta
+	local function fa() t.await(1) ta:kill() t.await(2) end
+	ta = t.task_t:new(fa)
+	local tp = t.par_and(ta, function() end)
+	tp()
+	assert(tp.state == "alive")
+	assert(ta.state == "alive")
+	t.emit(1)
+	assert(tp.state == "dead")
+	assert(ta.state == "dead")
+end
+tests.add(task_suicide_counts_towards_par_and)
+
 function inner_task_blocks_outer_task()
 	local x = 0
 	local ta = t.task_t:new(function() t.await(1) end)

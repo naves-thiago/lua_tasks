@@ -419,8 +419,9 @@ end
 -- Instantiates a new future_t object.
 -- This class allows waiting for events asynchronously or block until it's emitted.
 -- Param evt_id: Event identifier.
-function future_t:new(evt_id)
-	local out = setmetatable({state = "pending", data = {}, evt_id = evt_id},
+-- Param cancel_cb: If set, this function will be called if the future is cancelled
+function future_t:new(evt_id, cancel_cb)
+	local out = setmetatable({state = "pending", data = {}, evt_id = evt_id, cancel_cb = cancel_cb},
 	                         {__index = self})
 	scheduler.waiting[evt_id] = scheduler.waiting[evt_id] or event_t:new()
 	scheduler.waiting[out] = event_t:new()
@@ -460,6 +461,9 @@ function future_t:cancel()
 	end
 	scheduler.waiting[self.evt_id]:remove_listener(self.listener)
 	self.state = "cancelled"
+	if self.cancel_cb then
+		self.cancel_cb()
+	end
 	m.emit(self)
 	scheduler.waiting[self] = nil
 end

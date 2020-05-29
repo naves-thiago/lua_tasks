@@ -17,7 +17,7 @@ Refer to the comments in tasks.lua for more (and possibly more up to date) info.
   * If `once` is `true`, the callback will be executed only on the next time the event occurs, otherwise it will execute every time.
 * `stop_listening(<event>, callback)` removes the `callback` from the listeners.
 * `future_t` objects represent a *future* event return value.
-  * `future_t:new(<event>)` creates a future object for `<event>`.
+  * `future_t:new(<event>, [cancel_cb])` creates a future object for `<event>`.
   * `:get()` returns the `<event>` result if avaliable (i.e. `emit(<event>, ...)` was executed already) or behaves as `await(<event>)` otherwise.
   * `:cancel()` stops waiting for `<event>`. Unblocks all `:get()`s, returning `nil`. All `:get()` calls from now on return `nil` immediately.
   * `:is_canceled()` returns true if the future was cancelled.

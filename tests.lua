@@ -1059,6 +1059,50 @@ function future_cancel_done()
 end
 tests.add(future_cancel_done)
 
+function future_cancel_cb_executes_on_cancel()
+	local cancelled = false
+	local f = t.future_t:new(1, function() cancelled = true end)
+	assert(not f:is_done())
+	assert(not f:is_cancelled())
+	assert(not cancelled)
+	f:cancel()
+	assert(not f:is_done())
+	assert(f:is_cancelled())
+	assert(cancelled)
+end
+tests.add(future_cancel_cb_executes_on_cancel)
+
+function future_cancel_cb_doesnt_execute_on_double_cancel()
+	local cancelled = false
+	local f = t.future_t:new(1, function() cancelled = true end)
+	assert(not f:is_done())
+	assert(not f:is_cancelled())
+	assert(not cancelled)
+	f:cancel()
+	assert(not f:is_done())
+	assert(f:is_cancelled())
+	assert(cancelled)
+	cancelled = false
+	f:cancel()
+	assert(not f:is_done())
+	assert(f:is_cancelled())
+	assert(not cancelled)
+end
+tests.add(future_cancel_cb_doesnt_execute_on_double_cancel)
+
+function future_cancel_cb_doesnt_execute_after_done()
+	local cancelled = false
+	local f = t.future_t:new(1, function() cancelled = true end)
+	assert(not f:is_done())
+	assert(not f:is_cancelled())
+	assert(not cancelled)
+	t.emit(1)
+	assert(f:is_done())
+	assert(not f:is_cancelled())
+	assert(not cancelled)
+end
+tests.add(future_cancel_cb_doesnt_execute_after_done)
+
 function task_return_value()
 	local ta = t.task_t:new(function() return 1, nil, 2, nil, 3, nil end)
 	local r = t.pack(ta())

@@ -405,7 +405,9 @@ function m.par_and(...)
 			for _, t in ipairs(tasks) do
 				t(true)
 			end
-			m.await(uuid)
+			if pending > 0 then
+				m.await(uuid)
+			end
 		end, "par_and")
 end
 

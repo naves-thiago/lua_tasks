@@ -1246,6 +1246,38 @@ function par_or_return_value()
 end
 tests.add(par_or_return_value)
 
+function par_or_handles_subtask_not_blocking()
+	local function fa() return 1 end
+	local function fb() t.await(1) end
+
+	-- First ends first
+	local ta = t.task_t:new(fa)
+	local tb = t.task_t:new(fb)
+	local tp = t.par_or(ta, tb)
+	assert(ta.state == "ready")
+	assert(tb.state == "ready")
+	assert(tp.state == "ready")
+	tp()
+	assert(ta.state == "dead")
+	assert(tb.state == "ready")
+	assert(tp.state == "dead")
+	assert(tp:result() == 1)
+
+	-- First ends last
+	ta = t.task_t:new(fa)
+	tb = t.task_t:new(fb)
+	tp = t.par_or(tb, ta)
+	assert(ta.state == "ready")
+	assert(tb.state == "ready")
+	assert(tp.state == "ready")
+	tp()
+	assert(ta.state == "dead")
+	assert(tb.state == "dead")
+	assert(tp.state == "dead")
+	assert(tp:result() == 1)
+end
+tests.add(par_or_handles_subtask_not_blocking)
+
 function trigger_once_timer_executes_only_once()
 	local exec = false
 	local tmr = t.timer_t:new(1, function() exec = true end, false)

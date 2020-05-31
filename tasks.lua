@@ -363,6 +363,10 @@ function m.par_or(...)
 	local task = task_t:new(function()
 			for _, t in ipairs(tasks) do
 				t(true)
+				if t.state == "dead" then
+					-- t did not block (done already)
+					return t:result()
+				end
 			end
 			return m.await(uuid)
 		end, "par_or")
@@ -375,7 +379,7 @@ end
 -- Returns a task that starts multiple sub-tasks in parallel.
 -- The returned task finishes when all sub-tasks finish (or are killed).
 -- Params: Each parameter must be a task or a function.
--- Functions will be wrapped in new tasks to allow parallel execution.
+-- Functions will be wrapped in new tasks to allow concurrent execution.
 function m.par_and(...)
 	local tasks = {...}
 	local i = 1

@@ -169,9 +169,17 @@ local function task_parent_trace(t)
 end
 
 function task_t:new(f, name)
-	local t = {f = f, done = event_t:new(), state = "ready", parent = nil, coroutine = nil, name = name or "??"}
+	local t = {f = f, done = event_t:new(), state = "ready", parent = nil, coroutine = nil, name = name}
+	if not name then
+		t.name = tostring(t):sub(8)
+	end
 	trace("New task:", name)
-	return setmetatable(t, {__index = self, __call = self.__call})
+	return setmetatable(t, {__index = self, __call = self.__call, __tostring = self.__tostring})
+end
+
+-- Task's string representation
+function task_t:__tostring()
+	return "task: " .. self.name .. " (" .. self.state .. ")"
 end
 
 -- Starts the task execution
@@ -202,11 +210,6 @@ function task_t:__call(no_await, independent)
 	if success and self.ret_val then
 		return m.unpack(self.ret_val)
 	end
-	if not success then
-		print("Error in the task '" .. self.name .. "'")
-		print(debug.traceback(self.coroutine, error_message))
-		print(task_parent_trace(self))
-	end
 end
 
 -- Stops the task execution and execute the task's done event.
@@ -226,6 +229,10 @@ function task_t:kill()
 	self.done = nil
 	self.parent = nil
 	self.coroutine = nil
+	if scheduler.current == self then
+		-- Prevent returning to the task function on suicide
+		coroutine.yield()
+	end
 end
 
 -- Dissociates this task from its parent such that killing the parent
@@ -258,7 +265,17 @@ function task_t:_resume(...)
 	scheduler.current = self
 	trace("Resume task", self.name, "State", self.state, "Caller", caller_task and caller_task.name or "")
 	local success, error_message = coroutine.resume(self.coroutine, ...)
-	trace("Yield", self.name, "State", self.state, "Back to", caller_task and caller_task.name or "")
+	trace("Resume done", self.name, "State", self.state, "Back to", caller_task and caller_task.name or "")
+	if not success then
+		trace("Resume error (task", self.name .. "):", error_message)
+		local msg = {
+			"Error in the task '" .. self.name .. "'",
+			error_message,
+			debug.traceback(self.coroutine),
+			task_parent_trace(self)
+		}
+		error(table.concat(msg, "\n"))
+	end
 	scheduler.current = caller_task
 	return success, error_message
 end
@@ -276,7 +293,7 @@ local function _await_obj(evt)
 		trace("(Await) Resume task", curr.name, "State", curr.state)
 		if curr.state ~= "dead" then
 			curr.done:remove_listener(done_cb)
-			curr:_resume(...)
+			assert(curr:_resume(...))
 		end
 	end
 	function done_cb()

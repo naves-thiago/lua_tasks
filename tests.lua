@@ -1573,7 +1573,9 @@ tests.add(await_ms_unblock_multiple_tasks_at_once)
 
 ------------------------------------------------------
 
--- Get function names
+-- Get function names:
+-- Iterate over the _G table to find which name correspond
+-- to each test function reference
 local fname = {}
 for _, f in ipairs(tests) do
 	fname[f] = true
@@ -1584,7 +1586,9 @@ for name, f in pairs(_G) do
 	end
 end
 
--- Check command line args
+-- Check command line args:
+-- For each arg that names a test function, add it to a
+-- list of tests to execute
 if #arg > 0 then
 	local t = {}
 	for _, name in ipairs(arg) do
@@ -1598,7 +1602,10 @@ end
 
 local test_count = #tests
 local failed = 0
--- Run the tests
+-- Run the tests:
+-- For each test, write the test name and counter to the terminal,
+-- run the test and write OK or FAILED
+-- If the test failed, also print a stack trace
 for index, func in ipairs(tests) do
 	io.stdout:write(string.format("%s (%d/%d): ", fname[func], index, test_count))
 	local c = coroutine.create(func)
@@ -1612,6 +1619,7 @@ for index, func in ipairs(tests) do
 	end
 end
 
+-- Print a final report indicating how many tests failed
 print("-------------------------------------------")
 if failed == 0 then
 	print("All tests were successfull")

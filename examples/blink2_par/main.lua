@@ -25,22 +25,23 @@ function love.load()
 			while true do
 				par_or(
 					function()
-						par_and(
-							function() await("1_down") end,
-							function() await("2_down") end
+						await("1_down")
+						par_or(
+							function() await("2_down") emit("stop") end,
+							function() await_ms(500) end,
+							function() await("1_up") end,
+							function() await("2_up") end
 						)()
-						emit("stop")
 					end,
 					function()
-						par_and(
-							function() await("2_down") end,
-							function() await("1_down") end
+						await("2_down")
+						par_or(
+							function() await("1_down") emit("stop") end,
+							function() await_ms(500) end,
+							function() await("1_up") end,
+							function() await("2_up") end
 						)()
-						emit("stop")
-					end,
-					function() await_ms(500) end,
-					function() await("1_up") end,
-					function() await("2_up") end
+					end
 				)()
 			end
 		end,

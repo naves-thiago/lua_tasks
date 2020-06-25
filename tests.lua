@@ -196,6 +196,105 @@ function event_add_await_in_callback()
 end
 tests.add(event_add_await_in_callback)
 
+function event_remove_listener_in_callback()
+	local count_before_1 = -1
+	local count_after_1 = -1
+	local count_before_2 = -1
+	local count_after_2 = -1
+	local e = t.event_t:new()
+	local exec1 = false
+	local exec2 = false
+	local l1, l2
+
+	function l1()
+		exec1 = true
+		count_before_1 = e:listener_count()
+		e:remove_listener(l2)
+		count_after_1 = e:listener_count()
+	end
+
+	function l2()
+		exec2 = true
+		count_before_2 = e:listener_count()
+		e:remove_listener(l1)
+		count_after_2 = e:listener_count()
+	end
+
+	e:listen(l1)
+	e:listen(l2)
+	e()
+	assert(exec1)
+	assert(exec2)
+	assert(count_after_1 == count_before_1 - 1)
+	assert(count_after_2 == count_before_2 - 1)
+	assert(count_before_2 ~= count_before_1)
+	assert(e:listener_count() == 0)
+end
+tests.add(event_remove_listener_in_callback)
+
+function event_remove_await_in_callback()
+	local count_before_1 = -1
+	local count_after_1 = -1
+	local count_before_2 = -1
+	local count_after_2 = -1
+	local e = t.event_t:new()
+	local exec1 = false
+	local exec2 = false
+	local l1, l2
+
+	function l1()
+		exec1 = true
+		count_before_1 = e:listener_count()
+		e:remove_listener(l2)
+		count_after_1 = e:listener_count()
+	end
+
+	function l2()
+		exec2 = true
+		count_before_2 = e:listener_count()
+		e:remove_listener(l1)
+		count_after_2 = e:listener_count()
+	end
+
+	e:await(l1)
+	e:await(l2)
+	e()
+	assert(exec1)
+	assert(exec2)
+	assert(e:listener_count() == 0)
+end
+tests.add(event_remove_await_in_callback)
+
+function event_add_and_remove_listener_in_callback()
+	local count_before = -1
+	local count_middle = -1
+	local count_after = -1
+	local e = t.event_t:new()
+
+	local function l2() end
+	local function l3() end
+
+	local function l1()
+		count_before = e:listener_count()
+		e:await(l2)
+		e:listen(l3)
+		count_middle = e:listener_count()
+		e:remove_listener(l2)
+		e:remove_listener(l3)
+		e:remove_listener(l2)
+		e:remove_listener(l3)
+		count_after = e:listener_count()
+	end
+
+	e:listen(l1)
+	e()
+	assert(count_before == 1)
+	assert(count_middle == 3)
+	assert(count_after == 1)
+	assert(e:listener_count() == 1)
+end
+tests.add(event_add_and_remove_listener_in_callback)
+
 function tasks_start_with_state_ready()
 	local ta = t.task_t:new(function() end)
 	local tb = t.task_t:new(function() end)

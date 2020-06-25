@@ -125,11 +125,19 @@ end
 -- Removes a callback function from this event.
 -- Param f: Callback function. Ignored if not a listener.
 function event_t:remove_listener(f)
-	if self.listeners[f] or self.new_listeners[f] then
+	if self.listeners[f] or (self.new_listeners[f] and self.new_listeners[f] ~= "delete") then
 		self._listener_count = self._listener_count - 1
 	end
-	self.listeners[f] = nil
-	self.new_listeners[f] = nil
+
+	if not self.in_call then
+		self.listeners[f] = nil
+	end
+
+	if self.listeners[f] then
+		self.new_listeners[f] = "delete"
+	else
+		self.new_listeners[f] = nil
+	end
 end
 
 -- Returns the number of listeners
@@ -147,12 +155,20 @@ function event_t:__call(...)
 	for l, mode in pairs(self.listeners) do
 		if mode == "once" then
 			self.listeners[l] = nil
-			self._listener_count = self._listener_count - 1
+			if self.new_listeners[l] ~= "delete" then
+				-- Avoid decrementing the counter twice (here and in remove_listener)
+				-- on awaits removed from inside a listener
+				self._listener_count = self._listener_count - 1
+			end
 		end
 		l(self, ...) -- Must be after `if mode ...`, otherwise may break if `l()` calls `:await()`
 	end
 	for l, mode in pairs(self.new_listeners) do
-		self.listeners[l] = mode
+		if mode == "delete" then
+			self.listeners[l] = nil
+		else
+			self.listeners[l] = mode
+		end
 	end
 	self.new_listeners = {}
 	self.in_call = false

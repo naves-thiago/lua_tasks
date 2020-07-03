@@ -1,7 +1,7 @@
 --------------------------------------------------------------------
 -- Example:
 -- A main task waits for the space bar to be pressed.
--- Creates 10 sub-tasks, each blinking a LED in a different speed.
+-- Creates 10 sub-tasks, each blinking an LED in a different speed.
 -- After another space bar press, the main task finishes, killing
 -- all the sub-tasks.
 --------------------------------------------------------------------

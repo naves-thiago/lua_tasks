@@ -1,7 +1,7 @@
 --------------------------------------------------------------------
 -- Example:
--- Blink LED 1 once every second
--- If button 1 is pressed, stop blinking
+-- Blink an LED once every second
+-- If the space bar is pressed, stop blinking
 -- Callback API example
 --------------------------------------------------------------------
 local tasks = require("tasks")

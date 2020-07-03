@@ -1,6 +1,6 @@
 --------------------------------------------------------------------
 -- Example:
--- Blink LED 1 once every second
+-- Blink an LED once every second
 -- If button 1 is clicked, blink faster
 -- If button 2 is clicked, blink slower
 -- If both buttons are pressed in less than 500ms, stop blinking
@@ -35,7 +35,7 @@ local function stop()
 end
 
 sm_def = { -- state machine definition
-	--State     Event       New state   Function
+	--State     Event       New state   Function (called after state transition)
 	{"blink",   "1_down",   "wait_2",   start_timer},
 	{"blink",   "2_down",   "wait_1",   start_timer},
 	{"blink",   "1_up",     "blink",    function() stop_timer() faster() end},
@@ -50,8 +50,11 @@ sm_def = { -- state machine definition
 	{"wait_2",  "2_down",   "stop",     stop},
 }
 
+-- Generates a state machine:
+-- Converts a list of {current_state, event, new_state, function} to
+-- a map current_state -> (map event -> {new_state, function})
 function gen_state_machine()
-	sm = {}
+	sm = {} -- State machine
 	for _, t in ipairs(sm_def) do
 		local from_state, event, to_state, f = unpack(t)
 		local sm_state = sm[from_state] or {}
@@ -60,6 +63,7 @@ function gen_state_machine()
 	end
 end
 
+-- Changes the current state according to the state machine
 function update_state(event)
 	if not sm[state] then return end -- Final state
 	local t = sm[state][event]

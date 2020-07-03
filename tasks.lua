@@ -187,6 +187,7 @@ end
 function task_t:new(f, name)
 	local t = {f = f, done = event_t:new(), state = "ready", parent = nil, coroutine = nil, name = name}
 	if not name then
+		-- Name defaults to the table address
 		t.name = tostring(t):sub(8)
 	end
 	trace("New task:", name)
@@ -217,10 +218,10 @@ function task_t:__call(no_await, independent)
 	end
 	local success, error_message = self:_resume()
 	if success and self.parent and coroutine.status(self.coroutine) ~= "dead" and not no_await then
-		-- Started from another task and not done yet
+		-- Started from another task and not done yet. Block until done
 		trace("Block parent:", self.name, "Parent:", self.parent.name)
 		self.done:listen(function(_, ...) m.emit(self, ...) end)
-		m.await(self)
+		m.await(self) -- Prevents this method from returning when the task calls await
 		trace("Unblock parent:", self.name, "Parent:", self.parent.name)
 	end
 	if success and self.ret_val then
@@ -313,6 +314,7 @@ local function _await_obj(evt)
 		end
 	end
 	function done_cb()
+		-- Avoid holding a referente to the task after it's done
 		evt:remove_listener(event_cb)
 	end
 	curr.done:await(done_cb)
@@ -327,11 +329,11 @@ end
 -- Returns the parameters sent to emit() (minus the event id).
 function m.await(evt_id)
 	trace("Await:", tostring(evt_id), "Task:", scheduler.current.name)
-	local waiting = scheduler.waiting
 	if not scheduler.current then
 		return
 	end
 
+	local waiting = scheduler.waiting
 	if not waiting[evt_id] then
 		waiting[evt_id] = event_t:new()
 	end
@@ -346,6 +348,7 @@ function m.emit(evt_id, ...)
 	if e then
 		e(...)
 		if e:listener_count() == 0 then
+			-- Remove event if there are no listeners left to avoid memory leak
 			scheduler.waiting[evt_id] = nil
 		end
 	end
@@ -376,6 +379,9 @@ function m.par_or(...)
 			m.emit(uuid, task:result())
 		end
 	end
+	for _, t in ipairs(tasks) do
+		t.done:listen(done_cb)
+	end
 	local task = task_t:new(function()
 			for _, t in ipairs(tasks) do
 				t(true)
@@ -386,9 +392,6 @@ function m.par_or(...)
 			end
 			return m.await(uuid)
 		end, "par_or")
-	for _, t in ipairs(tasks) do
-		t.done:listen(done_cb)
-	end
 	return task
 end
 
@@ -422,6 +425,8 @@ function m.par_and(...)
 				t(true)
 			end
 			if pending > 0 then
+				-- This if is needed in case none of the subtasks blocked.
+				-- Otherwise await(uuid) would execute after emit(uuid)
 				m.await(uuid)
 			end
 		end, "par_and")
@@ -463,6 +468,9 @@ function future_t:new(evt_id, cancel_cb)
 	local out = setmetatable({state = "pending", data = {}, evt_id = evt_id, cancel_cb = cancel_cb},
 	                         {__index = self})
 	scheduler.waiting[evt_id] = scheduler.waiting[evt_id] or event_t:new()
+	-- Create an event so get() can block and we can make sure it unblocks after our listener
+	-- function executed. This is needed because there is no garantee on an event's listeners
+	-- execution order (i.e. get() can't also block on evt_id).
 	scheduler.waiting[out] = event_t:new()
 
 	out.listener = function(_, ...)
@@ -493,7 +501,7 @@ function future_t:is_done()
 	return self.state == "done"
 end
 
--- Cancels the future and stop waiting for the corresponding event.
+-- Cancels the future and stops waiting for the corresponding event.
 function future_t:cancel()
 	if self.state ~= "pending" then
 		return
@@ -554,6 +562,7 @@ function timer_t:stop()
 end
 
 -- Increments the current timestamp.
+-- Unblocks tasks waiting on timers, if needed.
 -- Param dt: Elapsed time since last call to this function (or the program starting) in milliseconds.
 function m.update_time(dt)
 	scheduler.timestamp = scheduler.timestamp + dt

@@ -51,10 +51,12 @@ end
 -----------------
 
 -- Param forwarding
+-- Stores all parameters in a table. The returned table should be unpacked using unpack().
 function m.pack(...)
 	return {[0]=select("#", ...), ...}
 end
 
+-- Returns the values stored in a table by pack()
 function m.unpack(t)
 	return table_unpack(t, 1, t[0])
 end
@@ -174,7 +176,11 @@ function event_t:__call(...)
 	self.in_call = false
 end
 
--- Task
+-- Task --
+
+-- Lists the parent hierarchy (ancestors) of a task.
+-- Param t: Task to list the ancestors.
+-- Retuns the list as a string.
 local function task_parent_trace(t)
 	local out = {"Task start stack:"}
 	repeat
@@ -184,6 +190,10 @@ local function task_parent_trace(t)
 	return table.concat(out, "\n")
 end
 
+-- task_t constructor.
+-- Param f: Function to be executed by the task.
+-- Param name: Task name (string) used in error messages and __tostring().
+-- Returns a new task_t object.
 function task_t:new(f, name)
 	local t = {f = f, done = event_t:new(), state = "ready", parent = nil, coroutine = nil, name = name}
 	if not name then
@@ -276,7 +286,8 @@ function task_t:result()
 end
 
 -- Internal function.
--- Resumes the task's coroutine and updates scheduler.current
+-- Resumes the task's coroutine and updates scheduler.current.
+-- Forwards parameters to the coroutine.
 function task_t:_resume(...)
 	local caller_task = scheduler.current
 	scheduler.current = self
@@ -297,11 +308,11 @@ function task_t:_resume(...)
 	return success, error_message
 end
 
--- Parallel  API
+-- Parallel  API --
 
 -- Internal function.
 -- Blocks the caller task until the <evt> event is emitted.
--- Param obj: event_t instance - the event to wait for.
+-- Param evt: event_t instance - the event to wait for.
 -- Returns the parameters sent to emit() (minus the event id).
 local function _await_obj(evt)
 	local curr = scheduler.current
@@ -342,6 +353,7 @@ end
 
 -- Emits the <evt_id> event, sending the remaining parameters as data.
 -- Unblocks await calls waiting for this event and executes the listeners.
+-- Param evt_id: Event identifier. Can be any valid table key.
 function m.emit(evt_id, ...)
 	trace("Emit:", tostring(evt_id))
 	local e = scheduler.waiting[evt_id]
@@ -458,7 +470,7 @@ function m.stop_listening(evt_id, callback)
 	scheduler.waiting[evt_id]:remove_listener(callback)
 end
 
--- Future API
+-- Future API --
 
 -- Instantiates a new future_t object.
 -- This class allows waiting for events asynchronously or block until it's emitted.
@@ -502,6 +514,7 @@ function future_t:is_done()
 end
 
 -- Cancels the future and stops waiting for the corresponding event.
+-- Unblocks tasks waiting on get() calls.
 function future_t:cancel()
 	if self.state ~= "pending" then
 		return
@@ -520,7 +533,7 @@ function future_t:is_cancelled()
 	return self.state == "cancelled"
 end
 
--- Timer API
+-- Timer API --
 
 -- Instantiates a new timet_t object.
 -- Param interval: Amount of time to wait before executing the callback.
@@ -578,7 +591,7 @@ function m.update_time(dt)
 	end
 end
 
--- Get current time in milliseconds.
+-- Get current timestamp in milliseconds.
 function m.now_ms()
 	return scheduler.timestamp
 end

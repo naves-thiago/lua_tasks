@@ -5,6 +5,7 @@
 -- If button 2 is clicked, blink slower
 -- If both buttons are pressed in less than 500ms, stop blinking
 -- Parallel API example
+-- Author: Thiago Duarte Naves
 --------------------------------------------------------------------
 
 local tasks = require("tasks")

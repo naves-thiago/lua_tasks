@@ -5,6 +5,7 @@
 -- Writes "Press 3 and 4 in any order".
 -- Creates a sub-task to wait for both buttons using `par_and`.
 -- Writes "Done".
+-- Author: Thiago Duarte Naves
 --------------------------------------------------------------------
 
 local tasks = require("tasks")

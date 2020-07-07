@@ -1,6 +1,7 @@
 --------------------------------------------------------------------
 -- Example:
 -- Two tasks, each blinking an LED in a different speed
+-- Author: Thiago Duarte Naves
 --------------------------------------------------------------------
 
 local tasks = require("tasks")

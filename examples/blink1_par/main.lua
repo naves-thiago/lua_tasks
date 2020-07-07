@@ -3,6 +3,7 @@
 -- Blink an LED once every second
 -- If the space bar is pressed, stop blinking
 -- Parallel API example
+-- Author: Thiago Duarte Naves
 --------------------------------------------------------------------
 local tasks = require("tasks")
 local main_task

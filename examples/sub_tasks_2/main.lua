@@ -4,6 +4,7 @@
 -- Creates 10 sub-tasks, each blinking an LED in a different speed.
 -- After another space bar press, the main task finishes, killing
 -- all the sub-tasks.
+-- Author: Thiago Duarte Naves
 --------------------------------------------------------------------
 
 local tasks = require("tasks")

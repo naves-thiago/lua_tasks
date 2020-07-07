@@ -1,6 +1,7 @@
 --------------------------------------------------------------------
 -- Example:
 -- Simulates a task requesting some data from an asynchronous API
+-- Author: Thiago Duarte Naves
 --------------------------------------------------------------------
 
 local tasks = require("tasks")

@@ -21,7 +21,7 @@ Refer to the comments in tasks.lua for more (and possibly more up to date) info.
   * `:get()` returns the `<event_id>` result if avaliable (i.e. `emit(<event_id>, ...)` was executed already) or behaves as `await(<event_id>)` otherwise.
   * `:cancel()` stops waiting for the event and executes the `cancel_cb`. Unblocks all `:get()`s, returning `nil`. All `:get()` calls from now on return `nil` immediately.
   * `:is_canceled()` returns true if the future was cancelled.
-  * `:is_done()` returns true if the `<event_id>` was emitted. If the future is done, `:get()` return immediately.
+  * `:is_done()` returns true if the `<event_id>` was emitted. If the future is done, `:get()` returns immediately.
 * `timer_t` allows callbacks to be executed based on time passage.
   * `timer_t:new(interval, callback, [cyclic])` creates a timer that will execute the `callback` after `interval` milliseconds.
     * If `cyclic` is `true`, the callback will be executed every `interval` interval (instead of only once).

@@ -513,6 +513,34 @@ function inner_task_removes_done_listener_from_parent_on_kill()
 end
 tests.add(inner_task_removes_done_listener_from_parent_on_kill)
 
+function inner_independent_task_safely_finishes_first()
+	local tb
+	local ta = t.task_t:new(function()
+		tb = t.task_t:new(function() t.await(1) end)
+		tb(true, true)
+		t.await(2)
+	end)
+	ta()
+
+	t.emit(1)
+	t.emit(2)
+end
+tests.add(inner_independent_task_safely_finishes_first)
+
+function inner_independent_task_safely_finishes_last()
+	local tb
+	local ta = t.task_t:new(function()
+		tb = t.task_t:new(function() t.await(1) end)
+		tb(true, true)
+		t.await(2)
+	end)
+	ta()
+
+	t.emit(2)
+	t.emit(1)
+end
+tests.add(inner_independent_task_safely_finishes_last)
+
 function task_no_wait_execution()
 	local x = 0
 	local ta = t.task_t:new(function() t.await(1) end)

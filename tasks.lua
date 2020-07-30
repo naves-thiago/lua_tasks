@@ -48,6 +48,13 @@ end
 local function trace(...)
 	--print(table.concat({"[TRACE]", ...}, ' '))
 end
+
+local function current_task_name()
+	if scheduler.current then
+		return scheduler.current.name
+	end
+	return ""
+end
 -----------------
 
 -- Param forwarding
@@ -200,7 +207,7 @@ function task_t:new(f, name)
 		-- Name defaults to the table address
 		t.name = tostring(t):sub(8)
 	end
-	trace("New task:", name)
+	trace("New task:", t.name)
 	return setmetatable(t, {__index = self, __call = self.__call, __tostring = self.__tostring})
 end
 
@@ -215,7 +222,7 @@ end
 -- Returns: Same values returned by the task function (set in the constructor) if it returns before this function returns.
 -- i.e. __call will only return if no_wait is false or the task function return immediately.
 function task_t:__call(no_await, independent)
-	trace("Start task:", self.name, "State:", self.state, "Caller:", (scheduler.current and scheduler.current.name))
+	trace("Start task:", self.name, "State:", self.state, "Caller:", current_task_name())
 	if self.state ~= "ready" then
 		return
 	end
@@ -249,7 +256,7 @@ function task_t:kill()
 	end
 	self.state = "dead"
 	self.done(self)
-	if self.parent and self.parent.done then
+	if self.parent and self.parent.done and self.suicide_cb then
 		self.parent.done:remove_listener(self.suicide_cb)
 	end
 	self.f = nil
@@ -339,7 +346,7 @@ end
 -- Param evt_id: Event identifier. Can be any valid table key.
 -- Returns the parameters sent to emit() (minus the event id).
 function m.await(evt_id)
-	trace("Await:", tostring(evt_id), "Task:", scheduler.current.name)
+	trace("Await:", tostring(evt_id), "Task:", current_task_name())
 	if not scheduler.current then
 		return
 	end
@@ -479,13 +486,15 @@ end
 function future_t:new(evt_id, cancel_cb)
 	local out = setmetatable({state = "pending", data = {}, evt_id = evt_id, cancel_cb = cancel_cb},
 	                         {__index = self})
+	trace("New future:", tostring(out), "caller", current_task_name())
 	scheduler.waiting[evt_id] = scheduler.waiting[evt_id] or event_t:new()
 	-- Create an event so get() can block and we can make sure it unblocks after our listener
 	-- function executed. This is needed because there is no garantee on an event's listeners
 	-- execution order (i.e. get() can't also block on evt_id).
-	scheduler.waiting[out] = event_t:new()
+	scheduler.waiting[out] = event_t:new() -- TODO remove
 
 	out.listener = function(_, ...)
+		trace("Future listener:", tostring(out))
 		out.data = m.pack(...)
 		out.state = "done"
 		m.emit(out, ...)

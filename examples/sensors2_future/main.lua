@@ -3,7 +3,7 @@
 -- Simulates a task requesting readings from multiple sensors with asynchronous APIs
 -- Each of the 3 sensors take a different amount of time to return a reading.
 -- Sensor 1 takes 2 seconds, sensor 2 takes 1 and sensor 3 takes 2.5.
--- Our function needs all 3 values and print them ordered.
+-- Our function needs all 3 values and prints them ordered.
 -- Author: Thiago Duarte Naves
 -------------------------------------------------------------------------------------
 

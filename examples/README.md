@@ -6,7 +6,7 @@ These are some usage examples written in [Löve](https://love2d.org).
 	* **blink1_cb**: Implementation using the callback API.
 * **blink2**:
 	* Blinks a LED once a second. Pressing the 1 key speeds up the blinking, pressing the 2 key slows it down. Pressing both together in a 500ms window stops the blink.
- 	* **blink2_par**: Implementation using the parallel blocks API (`par_and` / `par_or`).
+	* **blink2_par**: Implementation using the parallel blocks API (`par_and` / `par_or`).
 	* **blink2_cb**: Implementation using the callback API.
 * **independent_tasks**:
 	* Starts 2 tasks, each blinking a LED in a different speed.
@@ -16,3 +16,13 @@ These are some usage examples written in [Löve](https://love2d.org).
 	* Starts a main task that waits for the space bar. Once pressed, starts 10 sub-tasks, each blinking a LED in a different speed. The main task then waits for the space bar again. Pressing the it finishes the main task, killing the sub-tasks and stopping the blink.
 * **future_1**:
 	* Simulates a task requesting some data from an asynchronous API
+* **sensors1**
+	* Waits for the readings from 3 sensors that take different amounts of time to respond. Prints the readings ordered as they come, but only prints sensor 2 after sensor 1 and sensor 3 after 1 and 2.
+	* **sensors1_cb**: Implementation using the callback API.
+	* **sensors1_par**: Implementation using the parallel blocks API (`par_and` / `par_or`).
+	* **sensors1_future**: Implementation using the future API.
+* **sensors2**
+	* Waits for the readings from 3 sensors that take different amounts of time to respond. Prints the readings ordered after they are all available.
+	* **sensors1_cb**: Implementation using the callback API.
+	* **sensors1_par**: Implementation using the parallel blocks API (`par_and` / `par_or`).
+	* **sensors1_future**: Implementation using the future API.

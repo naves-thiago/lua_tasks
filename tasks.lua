@@ -170,7 +170,7 @@ function event_t:__call(...)
 				self._listener_count = self._listener_count - 1
 			end
 		end
-		l(self, ...) -- Must be after `if mode ...`, otherwise may break if `l()` calls `:await()`
+		l(...) -- Must be after `if mode ...`, otherwise may break if `l()` calls `:await()`
 	end
 	for l, mode in pairs(self.new_listeners) do
 		if mode == "delete" then
@@ -237,7 +237,7 @@ function task_t:__call(no_await, independent)
 	if success and self.parent and coroutine.status(self.coroutine) ~= "dead" and not no_await then
 		-- Started from another task and not done yet. Block until done
 		trace("Block parent:", self.name, "Parent:", self.parent.name)
-		self.done:listen(function(_, ...) m.emit(self, ...) end)
+		self.done:listen(function(...) m.emit(self, ...) end)
 		m.await(self) -- Prevents this method from returning when the task calls await
 		trace("Unblock parent:", self.name, "Parent:", self.parent.name)
 	end
@@ -324,7 +324,7 @@ end
 local function _await_obj(evt)
 	local curr = scheduler.current
 	local event_cb, done_cb
-	function event_cb(_, ...)
+	function event_cb(...)
 		trace("(Await) Resume task", curr.name, "State", curr.state)
 		if curr.state ~= "dead" then
 			curr.done:remove_listener(done_cb)
@@ -390,7 +390,7 @@ function m.par_or(...)
 	end
 	local uuid = tasks -- Reuse the tasks table as an unique event ID for this call
 	local in_done_reaction = false
-	local done_cb = function(_, task)
+	local done_cb = function(task)
 		if not in_done_reaction then
 			-- Prevent other subtasks from also emitting the event as we would still be
 			-- inside the event's reaction and therefore reenter event_t:__call
@@ -493,7 +493,7 @@ function future_t:new(evt_id, cancel_cb)
 	-- execution order (i.e. get() can't also block on evt_id).
 	scheduler.waiting[out] = event_t:new() -- TODO remove
 
-	out.listener = function(_, ...)
+	out.listener = function(...)
 		trace("Future listener:", tostring(out))
 		out.data = m.pack(...)
 		out.state = "done"

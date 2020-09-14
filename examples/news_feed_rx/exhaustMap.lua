@@ -67,7 +67,9 @@ function Observable:exhaustMap(callback)
 
 		outterSubscription = self:subscribe(onNext, onError, onCompleted)
 		return Subscription.create(function()
-			innerSubscription:unsubscribe()
+			if innerSubscription then
+				innerSubscription:unsubscribe()
+			end
 			outterSubscription:unsubscribe()
 		end)
 	end)

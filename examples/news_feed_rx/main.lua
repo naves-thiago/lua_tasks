@@ -7,9 +7,21 @@ require"share"
 local news_cards -- Card list to display the news
 
 local loadNews = rx.Observable.create(function(observer)
-	-- http request mockup
-	-- Load news and send to the observer
-	-- return rx.Subscription.create(function() ... end)
+	local function onNext(_, n)
+		observer:onNext(n)
+	end
+
+	local function onCompleted()
+		observer:onCompleted()
+	end
+
+	tasks.listen('news', onNext)
+	tasks.listen('news done', onCompleted)
+	tasks.emit('get news')
+	return rx.Subscription.create(function()
+		tasks.stop_listening('news', onNext)
+		tasks.stop_listening('news done', onCompleted)
+	end)
 end)
 
 local refresh = rx.BehaviorSubject.create(1)
@@ -24,7 +36,7 @@ function love.load()
 	news_cards = cards.card_list_t:new(5, 5, 400, h - 5)
 	news_cards:add_card(a)
 	news_cards:add_card(b)
-	tasks.listen('news', function(_, n)
+	loadNews:subscribe(function(n)
 		local c = cards.card_t:new(n)
 		news_cards:add_card(c)
 	end)
@@ -77,6 +89,7 @@ local http_task = tasks.task_t:new(function()
 			mock_sent = mock_sent + mock_content_steps[mock_current_step]
 			mock_current_step = mock_current_step + 1
 		end
+		tasks.emit('news done')
 	end
 end)
 http_task()

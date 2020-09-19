@@ -105,12 +105,16 @@ end
 
 -----------------------------------------------
 -- Timer interface
-function timer(initial, timeout)
-	local s = rx.Subject.create()
-	local counter = initial
-	tasks.every_ms(timeout, function()
-		s(counter)
-		counter = counter + 1
+function timer(initial, interval)
+	return rx.Observable.create(function(observer)
+		local count = initial
+		local function onNext()
+			observer:onNext(count)
+			count = count + 1
+		end
+		local timer = tasks.every_ms(interval, onNext)
+		return rx.Subscription.create(function()
+			timer:stop()
+		end)
 	end)
-	return s
 end

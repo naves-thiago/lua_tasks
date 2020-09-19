@@ -42,7 +42,12 @@ m.card_list_t = {spacing = 5}
 local card_list_t_meta = {__index = m.card_list_t}
 
 function m.card_list_t:new(x, y, w, h)
-	local r = {_cards = {}, _x = x, _y = y, _w = w, _h = h,
+	local r = {
+		_cards = {},
+		_x = x,
+		_y = y,
+		_w = w,
+		_h = h,
 		_curr_y = y -- Next inserted card's y position
 	}
 	return setmetatable(r, card_list_t_meta)
@@ -75,6 +80,11 @@ function m.card_list_t:add_card(c)
 	c.y = self._curr_y
 	c:set_width(self._w)
 	self._curr_y = self._curr_y + c._h + self.spacing
+end
+
+function m.card_list_t:clear()
+	self._cards = {}
+	self._curr_y = self._y
 end
 
 return m

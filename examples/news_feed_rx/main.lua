@@ -26,8 +26,11 @@ function love.load()
 	local _, h = love.window.getMode()
 	news_cards = cards.card_list_t:new(5, 5, 400, h - 5)
 	news:subscribe(function(n)
-		local c = cards.card_t:new(n)
-		news_cards:add_card(c)
+		news_cards:clear()
+		for _, str in ipairs(n) do
+			local c = cards.card_t:new(str)
+			news_cards:add_card(c)
+		end
 	end)
 end
 
@@ -68,12 +71,9 @@ local http_task = tasks.task_t:new(function()
 	while true do
 		tasks.await('get news')
 		--tasks.await_ms(2000)
-		for i = 1, mock_sent + mock_content_steps[mock_current_step] do
-			if not mock_content[i] then
-				break
-			end
-			tasks.emit('news', mock_content[i])
-		end
+		local count = mock_sent + mock_content_steps[mock_current_step]
+		count = math.min(count, #mock_content)
+		tasks.emit('news', {unpack(mock_content, 1, count)})
 		if mock_current_step < #mock_content_steps then
 			mock_sent = mock_sent + mock_content_steps[mock_current_step]
 			mock_current_step = mock_current_step + 1

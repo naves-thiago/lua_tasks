@@ -1,13 +1,13 @@
 local tasks = require'tasks'
 local cards = require'cards'
+local loading_icon_t = require('loadingIcon').loading_icon_t
 local rx = require'rx'
 require'exhaustMap'
 require'catchError'
 require'share'
 local news_cards -- Card list to display the news
 local refresh, news
--- refresh:next() deve fazer com que loadNews recarregue as noticias
--- VIDEO 14:00
+local loading_icon
 
 function love.load()
 	local loadNews = http_get('/newsfeed')
@@ -22,7 +22,7 @@ function love.load()
 		return loadNews
 	end)
 
-	timer(0, 30000):subscribe(refresh)
+	timer(0, 3000):subscribe(refresh)
 	local _, h = love.window.getMode()
 	news_cards = cards.card_list_t:new(5, 5, 400, h - 5)
 	news:subscribe(function(n)
@@ -32,6 +32,9 @@ function love.load()
 			news_cards:add_card(c)
 		end
 	end)
+
+	loading_icon = loading_icon_t:new(180, 30)
+	loading_icon.visible = false
 end
 
 function love.update(dt)
@@ -44,6 +47,7 @@ end
 
 function love.draw()
 	news_cards:draw()
+	loading_icon:draw()
 end
 
 

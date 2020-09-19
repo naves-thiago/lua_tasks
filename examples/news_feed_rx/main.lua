@@ -1,42 +1,30 @@
-local tasks = require"tasks"
-local cards = require"cards"
-local rx = require"rx"
-require"exhaustMap"
-require"catchError"
-require"share"
+local tasks = require'tasks'
+local cards = require'cards'
+local rx = require'rx'
+require'exhaustMap'
+require'catchError'
+require'share'
 local news_cards -- Card list to display the news
-
-local loadNews = rx.Observable.create(function(observer)
-	local function onNext(_, n)
-		observer:onNext(n)
-	end
-
-	local function onCompleted()
-		observer:onCompleted()
-	end
-
-	tasks.listen('news', onNext)
-	tasks.listen('news done', onCompleted)
-	tasks.emit('get news')
-	return rx.Subscription.create(function()
-		tasks.stop_listening('news', onNext)
-		tasks.stop_listening('news done', onCompleted)
-	end)
-end)
-
-local refresh = rx.BehaviorSubject.create(1)
-local news = refresh:exhaustMap(function() return loadNews end)
--- refresh_:next() deve fazer com que loadNews_ recarregue as noticias
+local refresh, news
+-- refresh:next() deve fazer com que loadNews recarregue as noticias
 -- VIDEO 14:00
 
 function love.load()
-	local a= cards.card_t:new("bla bla 0000 1234 __aa__ lskadlsad askdjskajdk 1231312 4354353 aksjdkajskdljalkd 09809898098098")
-	local b = cards.card_t:new("aaa bbb cccc dddd eeeeee fff gggggg hhhhh")
+	local loadNews = http_get('/newsfeed')
+		:catchError(function(e)
+			print('[ERROR] error loading news feed')
+			print('[ERROR] ' .. e)
+		end)
+		:share()
+
+	refresh = rx.BehaviorSubject.create(1)
+	news = refresh:exhaustMap(function()
+		return loadNews
+	 end)
+
 	local _, h = love.window.getMode()
 	news_cards = cards.card_list_t:new(5, 5, 400, h - 5)
-	news_cards:add_card(a)
-	news_cards:add_card(b)
-	loadNews:subscribe(function(n)
+	news:subscribe(function(n)
 		local c = cards.card_t:new(n)
 		news_cards:add_card(c)
 	end)
@@ -47,7 +35,7 @@ function love.update(dt)
 end
 
 function love.keypressed(key, scancode, isrepeat)
-	tasks.emit('get news')
+	refresh:onNext(1)
 end
 
 function love.draw()
@@ -78,14 +66,14 @@ local mock_sent = 0 -- sent posts
 local http_task = tasks.task_t:new(function()
 	while true do
 		tasks.await('get news')
-		tasks.await_ms(2000)
+		--tasks.await_ms(2000)
 		for i = 1, mock_sent + mock_content_steps[mock_current_step] do
 			if not mock_content[i] then
 				break
 			end
 			tasks.emit('news', mock_content[i])
 		end
-		if mock_current_step < #mock_content then
+		if mock_current_step < #mock_content_steps then
 			mock_sent = mock_sent + mock_content_steps[mock_current_step]
 			mock_current_step = mock_current_step + 1
 		end
@@ -93,3 +81,24 @@ local http_task = tasks.task_t:new(function()
 	end
 end)
 http_task()
+
+function http_get(path)
+	return rx.Observable.create(function(observer)
+		local function onNext(_, n)
+			observer:onNext(n)
+		end
+
+		local function onCompleted()
+			observer:onCompleted()
+		end
+
+		tasks.listen('news', onNext)
+		tasks.listen('news done', onCompleted)
+		tasks.emit('get news')
+		local is = rx.Subscription.create(function()
+			tasks.stop_listening('news', onNext)
+			tasks.stop_listening('news done', onCompleted)
+		end)
+		return is
+	end)
+end

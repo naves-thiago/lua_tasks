@@ -20,8 +20,9 @@ function love.load()
 	refresh = rx.BehaviorSubject.create(1)
 	news = refresh:exhaustMap(function()
 		return loadNews
-	 end)
+	end)
 
+	timer(0, 30000):subscribe(refresh)
 	local _, h = love.window.getMode()
 	news_cards = cards.card_list_t:new(5, 5, 400, h - 5)
 	news:subscribe(function(n)
@@ -95,10 +96,21 @@ function http_get(path)
 		tasks.listen('news', onNext)
 		tasks.listen('news done', onCompleted)
 		tasks.emit('get news')
-		local is = rx.Subscription.create(function()
+		return rx.Subscription.create(function()
 			tasks.stop_listening('news', onNext)
 			tasks.stop_listening('news done', onCompleted)
 		end)
-		return is
 	end)
+end
+
+-----------------------------------------------
+-- Timer interface
+function timer(initial, timeout)
+	local s = rx.Subject.create()
+	local counter = initial
+	tasks.every_ms(timeout, function()
+		s(counter)
+		counter = counter + 1
+	end)
+	return s
 end

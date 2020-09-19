@@ -37,10 +37,10 @@ function Observable.share(parent)
 		end
 
 		self._subscribers = self._subscribers or {}
-		if #self._subscribers == 0 then
+		table.insert(self._subscribers, observer)
+		if #self._subscribers == 1 then
 			self._parentSubscription = parent:subscribe(onNext, onError, onCompleted)
 		end
-		table.insert(self._subscribers, observer)
 
 		return rx.Subscription.create(function()
 			for i, o in ipairs(self._subscribers) do

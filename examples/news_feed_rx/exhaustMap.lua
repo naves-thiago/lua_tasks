@@ -40,12 +40,14 @@ function Observable:exhaustMap(callback)
 
 			local function innerOnCompleted()
 				innerComplete = true
-				innerSubscription:unsubscribe()
 				if outterComplete then
 					return observer:onCompleted()
 				end
 			end
 
+			if innerSubscription then
+				innerSubscription:unsubscribe()
+			end
 			success, innerSubscription = util.tryWithObserver(observer, function()
 				return innerObservable:subscribe(innerOnNext, innerOnError, innerOnCompleted)
 			end)

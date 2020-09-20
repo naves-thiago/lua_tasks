@@ -8,8 +8,22 @@ require'share'
 local news_cards -- Card list to display the news
 local refresh, news
 local load_ico
-local load_ico_position = rx.Observable.of(0)
 local load_ico_rotate = rx.Observable.of(0)
+
+love.mousemoved = rx.Subject.create()
+love.mousepressed = rx.Subject.create()
+love.mousereleased = rx.Subject.create()
+
+-- Report mouse Y movement while the mouse is down relative to the mouse down position
+local mouse_drag = love.mousepressed:exhaustMap(function(start_x, start_y)
+	return love.mousemoved
+		:map(function(x, y) return y - start_y end) -- extract Y and offset by the start Y
+		:takeUntil(love.mousereleased) -- complete when the mouse is released
+end)
+
+local load_ico_position = mouse_drag
+	:startWith(0) -- Start outside the screen
+	:map(function(y) return y - 20 end) -- Offset by the square size
 
 function love.load()
 	local loadNews = http_get('/newsfeed')
@@ -36,7 +50,7 @@ function love.load()
 	end)
 
 	load_ico = loading_icon_t:new(180, 0)
-	load_ico_position:subscribe(function(p) load_ico.y = p - 20 end)
+	load_ico_position:subscribe(function(p) load_ico.y = p end)
 	load_ico_rotate:subscribe(function(r) load_ico.rotation = math.rad(r) end)
 end
 
@@ -52,7 +66,6 @@ function love.draw()
 	news_cards:draw()
 	load_ico:draw()
 end
-
 
 -------------------------------------------------
 -- HTTP request mock

@@ -1,14 +1,19 @@
 local tasks = require'tasks'
 local cards = require'cards'
 local loading_icon_t = require('loadingIcon').loading_icon_t
+local animations = require'animations'
 local rx = require'rx'
 require'exhaustMap'
 require'catchError'
 require'share'
 local news_cards -- Card list to display the news
-local refresh, news
-local load_ico
-local load_ico_rotate = rx.Observable.of(0)
+local refresh    -- Subject that forces a news refresh
+local news       -- News feed observable
+local load_ico   -- Loading icon object
+local load_ico_rotate = rx.Observable.of(0) -- Loading icon rotation observable
+local load_ico_move_home = rx.Observable.defer(function() -- Loading icon spring back animation
+		return animations.tween(load_ico.y, 0, 200)
+	end)
 
 love.mousemoved = rx.Subject.create()
 love.mousepressed = rx.Subject.create()
@@ -16,9 +21,13 @@ love.mousereleased = rx.Subject.create()
 
 -- Report mouse Y movement while the mouse is down relative to the mouse down position
 local mouse_drag = love.mousepressed:exhaustMap(function(start_x, start_y)
-	return love.mousemoved
+	return rx.Observable.concat(love.mousemoved
 		:map(function(x, y) return y - start_y end) -- extract Y and offset by the start Y
-		:takeUntil(love.mousereleased) -- complete when the mouse is released
+		:takeUntil(love.mousereleased) -- stop tracking when the mouse is released
+		, load_ico_move_home)
+		-- Trigger a news reload when we go past half window
+		:tap(function(y) if y > window_height() / 2 then refresh:onNext(1) end end)
+		:takeWhile(function(y) return y <= window_height() / 2 end) -- Stop when we get bellow half screen
 end)
 
 local load_ico_position = mouse_drag
@@ -38,9 +47,8 @@ function love.load()
 		return loadNews
 	end)
 
-	timer(0, 3000):subscribe(refresh)
-	local _, h = love.window.getMode()
-	news_cards = cards.card_list_t:new(5, 5, 400, h - 5)
+	timer(0, 30000):subscribe(refresh)
+	news_cards = cards.card_list_t:new(5, 5, 400, window_height() - 5)
 	news:subscribe(function(n)
 		news_cards:clear()
 		for _, str in ipairs(n) do
@@ -65,6 +73,11 @@ end
 function love.draw()
 	news_cards:draw()
 	load_ico:draw()
+end
+
+function window_height()
+	local _, h = love.window.getMode()
+	return h
 end
 
 -------------------------------------------------

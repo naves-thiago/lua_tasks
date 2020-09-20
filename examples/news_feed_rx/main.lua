@@ -7,7 +7,9 @@ require'catchError'
 require'share'
 local news_cards -- Card list to display the news
 local refresh, news
-local loading_icon
+local load_ico
+local load_ico_position = rx.Observable.of(0)
+local load_ico_rotate = rx.Observable.of(0)
 
 function love.load()
 	local loadNews = http_get('/newsfeed')
@@ -33,8 +35,9 @@ function love.load()
 		end
 	end)
 
-	loading_icon = loading_icon_t:new(180, 30)
-	loading_icon.visible = false
+	load_ico = loading_icon_t:new(180, 0)
+	load_ico_position:subscribe(function(p) load_ico.y = p - 20 end)
+	load_ico_rotate:subscribe(function(r) load_ico.rotation = math.rad(r) end)
 end
 
 function love.update(dt)
@@ -47,7 +50,7 @@ end
 
 function love.draw()
 	news_cards:draw()
-	loading_icon:draw()
+	load_ico:draw()
 end
 
 

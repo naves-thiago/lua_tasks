@@ -14,27 +14,16 @@ local load_ico_rotate = rx.Observable.of(0) -- Loading icon rotation observable
 local load_ico_move_home = rx.Observable.defer(function() -- Loading icon spring back animation
 		return animations.tween(load_ico.y, 0, 200)
 	end)
+local load_ico_move_home_after_load
 
 love.mousemoved = rx.Subject.create()
 love.mousepressed = rx.Subject.create()
 love.mousereleased = rx.Subject.create()
 
--- Report mouse Y movement while the mouse is down relative to the mouse down position
-local mouse_drag = love.mousepressed:exhaustMap(function(start_x, start_y)
-	return rx.Observable.concat(love.mousemoved
-		:map(function(x, y) return y - start_y end) -- extract Y and offset by the start Y
-		:takeUntil(love.mousereleased) -- stop tracking when the mouse is released
-		, load_ico_move_home)
-		-- Trigger a news reload when we go past half window
-		:tap(function(y) if y > window_height() / 2 then refresh:onNext(1) end end)
-		:takeWhile(function(y) return y <= window_height() / 2 end) -- Stop when we get bellow half screen
-end)
-
-local load_ico_position = mouse_drag
-	:startWith(0) -- Start outside the screen
-	:map(function(y) return y - 20 end) -- Offset by the square size
+local load_ico_position
 
 function love.load()
+	print("Window height / 2: " .. window_height() / 2)
 	local loadNews = http_get('/newsfeed')
 		:catchError(function(e)
 			print('[ERROR] error loading news feed')
@@ -45,9 +34,33 @@ function love.load()
 	refresh = rx.BehaviorSubject.create(1)
 	news = refresh:exhaustMap(function()
 		return loadNews
-	end)
+	end):share()
 
-	timer(0, 30000):subscribe(refresh)
+	-- Report mouse Y movement while the mouse is down relative to the mouse down position
+	local mouse_drag = love.mousepressed:exhaustMap(function(start_x, start_y)
+		return rx.Observable.concat(
+				love.mousemoved
+					:map(function(x, y) return y - start_y end) -- extract Y and offset by the start Y
+					:takeUntil(love.mousereleased), -- stop tracking when the mouse is released
+				load_ico_move_home
+				)
+					-- Trigger a news reload when we go past half window
+					:tap(function(y) if y > window_height() / 2 then refresh:onNext(1) end end)
+					:takeWhile(function(y) return y <= window_height() / 2 end) -- Stop when we get bellow half screen
+	end):share()
+
+	-- Animate the icon back home after loading the news
+	load_ico_position_update = mouse_drag:exhaustMap(function()
+		return rx.Observable.concat(
+			mouse_drag:takeUntil(news),
+			load_ico_move_home)
+		end)
+
+	local load_ico_position = load_ico_position_update
+		:startWith(0) -- Start outside the screen
+		:map(function(y) return y - 20 end) -- Offset by the square size
+
+	--timer(0, 30000):subscribe(refresh) -- TODO uncomment
 	news_cards = cards.card_list_t:new(5, 5, 400, window_height() - 5)
 	news:subscribe(function(n)
 		news_cards:clear()
@@ -103,7 +116,7 @@ local mock_sent = 0 -- sent posts
 local http_task = tasks.task_t:new(function()
 	while true do
 		tasks.await('get news')
-		--tasks.await_ms(2000)
+		tasks.await_ms(2000)
 		local count = mock_sent + mock_content_steps[mock_current_step]
 		count = math.min(count, #mock_content)
 		tasks.emit('news', {unpack(mock_content, 1, count)})

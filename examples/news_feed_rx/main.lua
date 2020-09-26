@@ -6,11 +6,14 @@ local rx = require'rx'
 require'exhaustMap'
 require'catchError'
 require'share'
+require'resub'
+require'endWith'
+
 local news_cards -- Card list to display the news
 local refresh    -- Subject that forces a news refresh
 local news       -- News feed observable
 local load_ico   -- Loading icon object
-local load_ico_rotate = rx.Observable.of(0) -- Loading icon rotation observable
+local load_ico_rotate -- Loading icon rotation observable
 local load_ico_move_home = rx.Observable.defer(function() -- Loading icon spring back animation
 		return animations.tween(load_ico.y, 0, 200)
 	end)
@@ -70,9 +73,16 @@ function love.load()
 		end
 	end)
 
+	load_ico_rotate = refresh:exhaustMap(function()
+			return animations.tween(0, 360, 500)
+					:resub()
+					:takeUntil(news)
+					:endWith(0)
+		end)
+
 	load_ico = loading_icon_t:new(180, 0)
 	load_ico_position:subscribe(function(p) load_ico.y = p end)
-	load_ico_rotate:subscribe(function(r) load_ico.rotation = math.rad(r) end)
+	load_ico_rotate:subscribe(function(r) print(r) load_ico.rotation = r end)
 end
 
 function love.update(dt)
@@ -131,6 +141,7 @@ http_task()
 
 function http_get(path)
 	return rx.Observable.create(function(observer)
+		print('http request')
 		local function onNext(_, n)
 			observer:onNext(n)
 		end

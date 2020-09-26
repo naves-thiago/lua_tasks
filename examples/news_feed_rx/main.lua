@@ -9,24 +9,14 @@ require'share'
 require'resub'
 require'endWith'
 
-local news_cards -- Card list to display the news
-local refresh    -- Subject that forces a news refresh
-local news       -- News feed observable
-local load_ico   -- Loading icon object
-local load_ico_rotate -- Loading icon rotation observable
-local load_ico_move_home = rx.Observable.defer(function() -- Loading icon spring back animation
-		return animations.tween(load_ico.y, 0, 200)
-	end)
-local load_ico_move_home_after_load
-
 love.mousemoved = rx.Subject.create()
 love.mousepressed = rx.Subject.create()
 love.mousereleased = rx.Subject.create()
 
-local load_ico_position
+local news_cards
+local load_ico
 
 function love.load()
-	print("Window height / 2: " .. window_height() / 2)
 	local loadNews = http_get('/newsfeed')
 		:catchError(function(e)
 			print('[ERROR] error loading news feed')
@@ -34,10 +24,34 @@ function love.load()
 		end)
 		:share()
 
-	refresh = rx.BehaviorSubject.create(1)
-	news = refresh:exhaustMap(function()
+	-- Subject that forces a news refresh
+	local refresh = rx.BehaviorSubject.create(1)
+
+	-- News feed observable
+	local news = refresh:exhaustMap(function()
 		return loadNews
 	end):share()
+
+	-- Reload news periodically
+	timer(0, 30000):subscribe(refresh)
+
+	-- Card list to display the news
+	news_cards = cards.card_list_t:new(5, 5, 400, window_height() - 5)
+	news:subscribe(function(n)
+		news_cards:clear()
+		for _, str in ipairs(n) do
+			local c = cards.card_t:new(str)
+			news_cards:add_card(c)
+		end
+	end)
+
+	-- Loading icon object
+	load_ico = loading_icon_t:new(180, 0)
+
+	-- Loading icon spring back animation
+	local load_ico_move_home = rx.Observable.defer(function()
+			return animations.tween(load_ico.y, 0, 200)
+		end)
 
 	-- Report mouse Y movement while the mouse is down relative to the mouse down position
 	local mouse_drag = love.mousepressed:exhaustMap(function(start_x, start_y)
@@ -53,44 +67,31 @@ function love.load()
 	end):share()
 
 	-- Animate the icon back home after loading the news
-	load_ico_position_update = mouse_drag:exhaustMap(function()
+	local load_ico_position_update = mouse_drag:exhaustMap(function()
 		return rx.Observable.concat(
 			mouse_drag:takeUntil(news),
 			load_ico_move_home)
-		end)
+	end)
 
+	-- Emits the positions for the loading icon
 	local load_ico_position = load_ico_position_update
 		:startWith(0) -- Start outside the screen
 		:map(function(y) return y - 20 end) -- Offset by the square size
 
-	--timer(0, 30000):subscribe(refresh) -- TODO uncomment
-	news_cards = cards.card_list_t:new(5, 5, 400, window_height() - 5)
-	news:subscribe(function(n)
-		news_cards:clear()
-		for _, str in ipairs(n) do
-			local c = cards.card_t:new(str)
-			news_cards:add_card(c)
-		end
+	-- Loading icon rotation observable
+	local load_ico_rotate = refresh:exhaustMap(function()
+		return animations.tween(0, 360, 500)
+				:resub()
+				:takeUntil(news)
+				:endWith(0)
 	end)
 
-	load_ico_rotate = refresh:exhaustMap(function()
-			return animations.tween(0, 360, 500)
-					:resub()
-					:takeUntil(news)
-					:endWith(0)
-		end)
-
-	load_ico = loading_icon_t:new(180, 0)
 	load_ico_position:subscribe(function(p) load_ico.y = p end)
-	load_ico_rotate:subscribe(function(r) print(r) load_ico.rotation = r end)
+	load_ico_rotate:subscribe(function(r) load_ico.rotation = r end)
 end
 
 function love.update(dt)
 	tasks.update_time(dt * 1000)
-end
-
-function love.keypressed(key, scancode, isrepeat)
-	refresh:onNext(1)
 end
 
 function love.draw()
@@ -141,7 +142,6 @@ http_task()
 
 function http_get(path)
 	return rx.Observable.create(function(observer)
-		print('http request')
 		local function onNext(_, n)
 			observer:onNext(n)
 		end

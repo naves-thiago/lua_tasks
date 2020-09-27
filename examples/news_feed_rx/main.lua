@@ -17,6 +17,9 @@ local news_cards
 local load_ico
 
 function love.load()
+	love.window.setMode(410, 600)
+	love.window.setTitle("News")
+
 	local loadNews = http_get('/newsfeed')
 		:catchError(function(e)
 			print('[ERROR] error loading news feed')
@@ -46,7 +49,7 @@ function love.load()
 	end)
 
 	-- Loading icon object
-	load_ico = loading_icon_t:new(180, 0)
+	load_ico = loading_icon_t:new(195, 0)
 
 	-- Loading icon spring back animation
 	local load_ico_move_home = rx.Observable.defer(function()

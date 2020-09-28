@@ -49,7 +49,7 @@ function love.load()
 	end)
 
 	-- Loading icon object
-	load_ico = loading_icon_t:new(195, 0)
+	load_ico = loading_icon_t:new(195, 0, 20)
 
 	-- Loading icon spring back animation
 	local load_ico_move_home = rx.Observable.defer(function()

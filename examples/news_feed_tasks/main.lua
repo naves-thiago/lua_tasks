@@ -10,7 +10,13 @@ local load_ico
 -- Request the news and fill the news_cards
 function update_news()
 	tasks.task_t:new(function()
-		local n = http_get('/newsfeed')
+		local success, n = http_get('/newsfeed')
+		if not success then
+			print('[ERROR] error loading news feed')
+			print('[ERROR] ' .. n)
+			return
+		end
+
 		news_cards:clear()
 		for _, str in ipairs(n) do
 			local c = cards.card_t:new(str)
@@ -131,5 +137,11 @@ http_task()
 
 function http_get(path)
 	tasks.emit('get news')
-	return tasks.await('news')
+	return tasks.par_or(
+		function()
+			return true, tasks.await('news')
+		end,
+		function()
+			return false, tasks.await('news error')
+		end)()
 end

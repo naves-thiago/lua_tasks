@@ -1,3 +1,19 @@
+--------------------------------------------------------------------
+-- Example:
+-- News feed: Reads a list of posts from an HTTP server (mockup) and
+-- displays them on the screen.
+-- Posts are refreshed every 30s.
+-- Draging down with the mouse past half of the screen reloads the
+-- posts. A spinnig square indicates the news are being loaded.
+--
+-- RxLua API example
+--
+-- This example was adapted from the one presented by Ben Lesh (@benlesh)
+-- in the "Complex features made easy with RxJS" talk presented at
+-- JSFoo 2018.
+--
+-- Author: Thiago Duarte Naves
+--------------------------------------------------------------------
 local tasks = require'tasks'
 local cards = require'cards'
 local loading_icon_t = require('loadingIcon').loading_icon_t

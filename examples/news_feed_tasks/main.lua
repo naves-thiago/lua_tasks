@@ -43,7 +43,7 @@ end
 
 -- Animate the loading icon back home
 function load_ico_move_home()
-	tween(load_ico.y, -load_ico.size, 500, function(y)
+	tween(load_ico.y, -load_ico.size, 200, function(y)
 		load_ico.y = y
 	end)()
 end

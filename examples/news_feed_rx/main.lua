@@ -94,8 +94,8 @@ function love.load()
 
 	-- Emits the positions for the loading icon
 	local load_ico_position = load_ico_position_update
-		:startWith(0) -- Start outside the screen
-		:map(function(y) return y - 20 end) -- Offset by the square size
+		:startWith(-load_ico.size / 2) -- Start outside the screen (account for diagonal size due to rotation)
+		:map(function(y) return y - load_ico.size end) -- Offset by the square size
 
 	-- Loading icon rotation observable
 	local load_ico_rotate = refresh:exhaustMap(function()

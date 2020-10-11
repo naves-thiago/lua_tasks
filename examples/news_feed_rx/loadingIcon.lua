@@ -25,7 +25,8 @@ end
 
 function m.loading_icon_t:draw()
 	if self.visible then
-		love.graphics.draw(self._canvas, self.x, self.y, math.rad(self.rotation), 1, 1, self.size / 2, self.size / 2)
+		love.graphics.draw(self._canvas, self.x + self.size / 2, self.y + self.size / 2,
+			math.rad(self.rotation), 1, 1, self.size / 2, self.size / 2)
 	end
 end
 

@@ -79,7 +79,7 @@ function love.load()
 	love.window.setMode(410, 600)
 	love.window.setTitle("News")
 
-	load_ico = loading_icon_t:new(195, -20, 20)
+	load_ico = loading_icon_t:new(195, -30, 20)
 	news_cards = cards.card_list_t:new(5, 5, 400, window_height() - 5)
 
 	-- Reload news periodically

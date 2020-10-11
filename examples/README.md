@@ -14,6 +14,10 @@ These are some usage examples written in [Löve](https://love2d.org).
 	* Simulates a task requesting some data from an asynchronous API
 * **independent_tasks**:
 	* Starts 2 tasks, each blinking a LED in a different speed.
+* **news_feed**:
+	* Simulates a list of news being loaded via HTTP and displayed as cards on the screen. The list is refreshed every 30s and can be manually refreshed by dragging down past the middle of the screen.
+	* **news_feed_rx**: Implementation using [RxLua](https://github.com/bjornbytes/RxLua). Integrates RxLua and tasks.
+	* **news_feed_tasks**: Implementation using tasks and the parallel blocks API (`par_and` / `par_or`).
 * **sensors1**
 	* Waits for the readings from 3 sensors that take different amounts of time to respond. Prints the readings ordered as they come, but only prints sensor 2 after sensor 1 and sensor 3 after 1 and 2.
 	* **sensors1_cb**: Implementation using the callback API.

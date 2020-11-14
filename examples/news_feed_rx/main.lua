@@ -41,7 +41,6 @@ function love.load()
 			print('[ERROR] error loading news feed')
 			print('[ERROR] ' .. e)
 		end)
-		:share()
 
 	-- Subject that forces a news refresh
 	local refresh = rx.BehaviorSubject.create(1)

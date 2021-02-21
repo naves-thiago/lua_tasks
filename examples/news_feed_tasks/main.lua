@@ -49,20 +49,22 @@ function load_ico_move_home()
 end
 
 -- Reload task function
-function reload_f()
+function manual_reload_f()
 	while true do
-		local start_x, start_y = tasks.await('mousepressed')
-		local reload = tasks.par_or(function()
-			local x, y
-			repeat
-				x, y = tasks.await('mousemoved')
-				load_ico.y = y - start_y - load_ico.size
-			until y - start_y >= window_height() / 2
-			return true
-		end,
-		function()
-			tasks.await('mousereleased')
-		end)
+		local _, start_y = tasks.await('mousepressed')
+		local reload = tasks.par_or(
+			function()
+				local y
+				repeat
+					_, y = tasks.await('mousemoved')
+					load_ico.y = y - start_y - load_ico.size
+				until y - start_y >= window_height() / 2
+				return true
+			end,
+			function()
+				tasks.await('mousereleased')
+			end
+		)
 
 		if reload() then
 			local spin_task = tween(0, 360, 500, function(r)
@@ -82,11 +84,17 @@ function love.load()
 	load_ico = loading_icon_t:new(195, -30, 20)
 	news_cards = cards.card_list_t:new(5, 5, 400, window_height() - 5)
 
-	-- Reload news periodically
+	-- Load news when the app start
 	update_news()
-	local auto_reload_tmr = tasks.every_ms(30000, update_news)
 
-	reload_task = tasks.task_t:new(reload_f)
+	-- Reload news periodically
+	tasks.task_t:new(function()
+		while true do
+			tasks.await_ms(30000)
+			update_news()
+		end
+	end)()
+	reload_task = tasks.task_t:new(manual_reload_f)
 	reload_task()
 end
 
